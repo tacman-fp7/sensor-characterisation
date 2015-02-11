@@ -53,6 +53,10 @@ void OmegaATIThread::run()
 	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
    printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
   
+   double ftFxFilt, ftFyFilt, ftFzFilt;
+	_forceTorqueData.getFilteredForces(&ftFxFilt, &ftFyFilt, &ftFzFilt);
+   printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFxFilt, ftFyFilt, ftFzFilt);
+
 	
    printf("PID gains: % 3.4f, % 3.4f, % 3.4f\n", drdGetEncPGain(), drdGetEncIGain(), drdGetEncDGain());
 
