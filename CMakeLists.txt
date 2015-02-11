@@ -11,7 +11,8 @@
 # Project details
 # ###########################################################################
 cmake_minimum_required(VERSION 2.6)
-set(PROJECTNAME tacman-sensorCharacterisation)
+#set(PROJECTNAME tacman-sensorCharacterisation)
+set(PROJECTNAME tacman)
 project(${PROJECTNAME})
 
 set(FORCE_DIMENSION_HOME "C:/Program\ Files/Force\ Dimension/sdk-3.5.2")

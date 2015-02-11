@@ -10,7 +10,6 @@
 #include <yarp/os/BufferedPort.h>
 #include <yarp/os/Network.h>
 
-
 #include <string>
 #include <iostream>
 
@@ -18,8 +17,7 @@ using namespace std;
 using namespace yarp::os;
 
 #define FT_Z 2
-#define OMEGA_UPPER_LIMIT 0.08
-#define OMEGA_LOWER_LIMIT -0.065
+
 void OmegaATIThread::run()
 {
 
@@ -27,54 +25,64 @@ void OmegaATIThread::run()
 	Bottle *ft_input = _port_ft.read(); //  Read f/t data 
 	Bottle *fingertip_input = _port_fingertip.read(); // Read fingertip data 
 
-
-	if(ft_input == NULL)
-	{
-		cout << "Warning! No force/torque data." << endl;
-		return; 
-	}
-	else if(fingertip_input == NULL)
+	if(fingertip_input == NULL)
 	{
 		cout << "Warning! No finger data." << endl;
 		return;
 	}
 
-	// Get the force in the Z direction of the ft sensor
-	double ftZ =  ft_input->get(FT_Z).asDouble();
+	_forceTorqueData.updateData(ft_input);
 
 	
-	if(!drdIsRunning())
-		cout << "Warning! DRD is not running" << endl;
 
-	double targetForce = -12;
-	double error = targetForce - ftZ;
+	// Get the force in the Z direction of the ft sensor
+	//double ftZ =  ft_input->get(FT_Z).asDouble();
+
+	
+	//if(!drdIsRunning())
+		//cout << "Warning! DRD is not running" << endl;
+
+	//double targetForce = -12;
+	//double error = targetForce - ftZ;
 
 	double omegaFx, omegaFy, omegaFz;
 	dhdGetForce(&omegaFx, &omegaFy, &omegaFz);
 	printf("Omega Forces: %0.4f, %0.4f, %0.4f\n", omegaFx, omegaFy, omegaFz);
 
-   printf("ATI Fz: %0.4f\n", ftZ);
-	cout << "Omega Pos: ";
-	double x, y, z;
+	double ftFx, ftFy, ftFz;
+	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
+   printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
+  
+	
+   printf("PID gains: % 3.4f, % 3.4f, % 3.4f\n", drdGetEncPGain(), drdGetEncIGain(), drdGetEncDGain());
+
+   double x, y, z;
 	_omegaData.getAxesPos(&x, &y, &z);
-	printf("%0.4f, %0.4f, %0.4f\n", x, y, z);
-	double newPosZ = z + 0.1 * error;
-	if(newPosZ < OMEGA_LOWER_LIMIT)
-		newPosZ = OMEGA_LOWER_LIMIT;
-	if(newPosZ > OMEGA_UPPER_LIMIT)
-		newPosZ = OMEGA_UPPER_LIMIT;
+	 cout << "Desired pos: ";
+	printf("% 3.4f, % 3.4f, % 3.4f\n", x, y, z);
+	
+	//double newPosZ = z + 0.1 * error;
+	//if(newPosZ < OMEGA_LOWER_LIMIT)
+	//	newPosZ = OMEGA_LOWER_LIMIT;
+	//if(newPosZ > OMEGA_UPPER_LIMIT)
+	//	newPosZ = OMEGA_UPPER_LIMIT;
 
 	double 	drdPos[DHD_MAX_DOF];
 	drdGetPositionAndOrientation(drdPos, NULL);
-	printf("DRD: %0.4f, %0.4f, %0.4f\n\n", drdPos[0], drdPos[1], drdPos[2]);
-	_omegaData.setZ(newPosZ);
-	drdMoveToPos(x,y,newPosZ);
+	printf("Actual  pos: % 3.4f, % 3.4f, % 3.4f\n\n", drdPos[0], drdPos[1], drdPos[2]);
+	//_omegaData.setZ(newPosZ);
+	drdMoveToPos(x,y,z);
+
+	
 }
 
 bool OmegaATIThread::threadInit()
 {
 
 	bool ret = true;
+	_stepSize = 0.0002;
+
+	
 	// Initialise the omega device
 	ret = init_omega();
 
@@ -140,6 +148,9 @@ bool init_omega()
 		return false;
 	}
 
+	drdSetEncPGain(8); //TDODO: config file parameter
+	drdSetEncIGain(32);
+
 	// goto workspace center
 	if (drdMoveToPos (0.0, 0.0, 0.0) < 0) 
 	{
@@ -147,18 +158,29 @@ bool init_omega()
 		dhdSleep (2.0);
 		return false;
 	}
+
 	return true;
 }
 
 void OmegaATIThread::UpdateOmegaPosition()
 {
-	//double px, py, pz, rx, ry, rz;
-	//dhdGetPositionAndOrientationRad(&px, &py, &pz, &rx, &ry, &rz);
-	//_omegaData.setAxesPos(pz, py, pz);
+	_omegaData.updateData();
+}
 
-	double robotPose[DHD_MAX_DOF];
-	drdGetPositionAndOrientation( robotPose, NULL); // I am not interested in the orientation matrix
-	_omegaData.setAxesPos(robotPose[0], robotPose[1], robotPose[2] );
+void OmegaATIThread::stepUp()
+{
+	_omegaData.setZ(_omegaData.getZ() + _stepSize);
+}
+
+void OmegaATIThread::stepDown()
+{
+	_omegaData.setZ(_omegaData.getZ() - _stepSize);
+}
+
+void OmegaATIThread::updateBias()
+{
+	_omegaData.setBias();
+	_forceTorqueData.setBias();
 
 
 }

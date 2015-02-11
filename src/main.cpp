@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
 
 
 	Network yarp;
-	bool posCtrl = false;
+	bool posCtrl = true;
 	if (!yarp.checkNetwork())
 	{
 		printf("No yarp network, quitting\n");
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
 
 
 
-	OmegaATIThread experimentThread(4);
+	OmegaATIThread experimentThread(1);
 	experimentThread.start();
 
 
@@ -38,9 +38,9 @@ int main(int argc, char *argv[]) {
 		if(dhdKbHit())
 		{
 			char key = dhdKbGet ();
-			if(key == 'q') // quit the experiment
+			if(key == 'q' || key == 'Q') // quit the experiment
 				break;
-			else if(key == 'p') // update the position of the Omega device.
+			else if(key == 'p' || key == 'P') // update the position of the Omega device.
 			{
 				posCtrl = !posCtrl;
 				if(posCtrl)
@@ -49,8 +49,22 @@ int main(int argc, char *argv[]) {
 					drdStart();
 				}
 				else
+				{
 					drdStop();
+					dhdSleep(1);
+					dhdEnableForce(DHD_ON);
+				}
 			}
+			else if( key == 'U')
+			{
+				experimentThread.stepUp();
+			}
+			else if( key == 'D')
+			{
+				experimentThread.stepDown();
+			}
+			else if ( key == 'b' || key == 'B')
+				experimentThread.updateBias();
 		}
 	}
 
