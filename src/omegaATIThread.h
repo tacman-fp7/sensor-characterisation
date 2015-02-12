@@ -3,6 +3,7 @@
 #include <yarp/os/RateThread.h>
 #include <yarp/os/BufferedPort.h>
 #include <yarp/os/Time.h>
+#include <yarp/os/Stamp.h>
 #include <yarp/os/BufferedPort.h>
 #include <yarp/os/Mutex.h>
 #include <iostream>
@@ -231,6 +232,10 @@ private:
 private:
 	BufferedPort<Bottle> _port_ft;
 	BufferedPort<Bottle> _port_fingertip;
+	BufferedPort<Bottle> _port_omega;
+	BufferedPort<Bottle> _port_ftFiltered;
+
+	yarp::os::Stamp _timeStamp;
 
 	//omegaData _omegaData_init; // Storage for initial position
 
