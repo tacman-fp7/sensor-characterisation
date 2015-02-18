@@ -12,8 +12,10 @@
 #include <array>
 
 #define OMEGA_UPPER_LIMIT 0.08 //TODO: set them as class variables
-#define OMEGA_LOWER_LIMIT -0.03
+#define OMEGA_LOWER_LIMIT -0.035
 #define FILTER_WINDOW 10
+#define FT_CHANNELS 6
+
 //typedef struct forceTorqueData forceTorqueDataType;
 
 using namespace yarp::os;
@@ -117,7 +119,7 @@ struct forceTorqueData
 		_fxFiltered = _fyFiltered = _fzFiltered = 0;
 		_txFiltered = _tyFiltered = _tzFiltered = 0;
 
-		array<double, 6> tempArray;
+		array<double, FT_CHANNELS> tempArray;
 		tempArray.fill(0);
 		for (int i = 0; i < FILTER_WINDOW; i++)
 			_filterBuffer.push(tempArray);
@@ -131,7 +133,7 @@ struct forceTorqueData
 			return false; 
 		}
 
-		
+
 		_mutex.lock();
 		_fx = ft_input->get(0).asDouble();
 		_fy = ft_input->get(1).asDouble();
@@ -139,7 +141,7 @@ struct forceTorqueData
 		_tx = ft_input->get(3).asDouble();
 		_ty = ft_input->get(4).asDouble();
 		_tz = ft_input->get(5).asDouble();
-		
+
 		array<double, 6> tempArray;
 		tempArray.at(0) = _fx - _fxBias;
 		tempArray.at(1) = _fy - _fyBias;
@@ -178,12 +180,17 @@ struct forceTorqueData
 		_mutex.lock();
 		_fxBias = _fx; _fyBias = _fy; _fzBias = _fz;
 		_mutex.unlock();
+		// Reset the filter buffer to zero
+		this->resetFilterBuffer();
 	}
 	void setBias(double fxBias, double fyBias, double fzBias)
 	{
 		_mutex.lock();
 		_fxBias = fxBias; _fyBias = fyBias; _fzBias = fzBias;
 		_mutex.unlock();
+
+		// Reset the filter buffer to zero
+		this->resetFilterBuffer();
 	}
 
 	void getForces(double *fx, double *fy, double *fz)
@@ -206,10 +213,22 @@ struct forceTorqueData
 		_mutex.unlock();
 	}
 private:
+
+	void resetFilterBuffer()
+	{
+		_mutex.lock();
+		_filterBuffer.empty();
+		array<double, FT_CHANNELS> tempArray;
+		tempArray.fill(0);
+		for (int i = 0; i < FILTER_WINDOW; i++)
+			_filterBuffer.push(tempArray);
+		_mutex.unlock();
+
+	}
 	double _fx, _fy, _fz, _tx, _ty, _tz;
 	double _fxBias, _fyBias, _fzBias, _txBias, _tyBias, _tzBias;
 	double _fxFiltered, _fyFiltered, _fzFiltered, _txFiltered, _tyFiltered, _tzFiltered;
-	queue< array<double, 6> > _filterBuffer;
+	queue< array<double, FT_CHANNELS> > _filterBuffer;
 	Mutex _mutex;
 
 };
@@ -220,6 +239,7 @@ public:
 	OmegaATIThread(int period):RateThread(period){};
 	void UpdateOmegaPosition();
 	void stepUp();
+	void stepDownTest();
 	void stepDown();
 	void updateBias();
 	bool threadInit();

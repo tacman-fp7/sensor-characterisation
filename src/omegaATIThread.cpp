@@ -39,7 +39,7 @@ void OmegaATIThread::run()
 
 	double omegaFx, omegaFy, omegaFz;
 	dhdGetForce(&omegaFx, &omegaFy, &omegaFz);
-	printf("Omega Forces: %0.4f, %0.4f, %0.4f\n", omegaFx, omegaFy, omegaFz);
+	//printf("Omega Forces: %0.4f, %0.4f, %0.4f\n", omegaFx, omegaFy, omegaFz);
 
 	double ftFx, ftFy, ftFz;
 	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
@@ -54,7 +54,7 @@ void OmegaATIThread::run()
 
 	double ftFxFilt, ftFyFilt, ftFzFilt;
 	_forceTorqueData.getFilteredForces(&ftFxFilt, &ftFyFilt, &ftFzFilt);
-	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFxFilt, ftFyFilt, ftFzFilt);
+	//printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFxFilt, ftFyFilt, ftFzFilt);
 	Bottle& ftFiltered_output = _port_ftFiltered.prepare();
 	ftFiltered_output.clear();
 	ftFiltered_output.addDouble(ftFxFilt);
@@ -63,11 +63,11 @@ void OmegaATIThread::run()
 	_port_ftFiltered.setEnvelope(_timeStamp);
 	_port_ftFiltered.write();
 
-	printf("PID gains: % 3.4f, % 3.4f, % 3.4f\n", drdGetEncPGain(), drdGetEncIGain(), drdGetEncDGain());
+	//printf("PID gains: % 3.4f, % 3.4f, % 3.4f\n", drdGetEncPGain(), drdGetEncIGain(), drdGetEncDGain());
 	double x, y, z;
 	_omegaData.getAxesPos(&x, &y, &z);
-	cout << "Desired pos: ";
-	printf("% 3.4f, % 3.4f, % 3.4f\n", x, y, z);
+	//cout << "Desired pos: ";
+	//printf("% 3.4f, % 3.4f, % 3.4f\n", x, y, z);
 	drdMoveToPos(x,y,z);
 
 	// Sending the current omega Position
@@ -79,7 +79,7 @@ void OmegaATIThread::run()
 		omegaOutput.addDouble(drdPos[i]);
 	_port_omega.setEnvelope(_timeStamp);
 	_port_omega.write();
-	printf("Actual  pos: % 3.4f, % 3.4f, % 3.4f\n\n", drdPos[0], drdPos[1], drdPos[2]);
+	//printf("Actual  pos: % 3.4f, % 3.4f, % 3.4f\n\n", drdPos[0], drdPos[1], drdPos[2]);
 
 
 
@@ -103,6 +103,11 @@ bool OmegaATIThread::threadInit()
 	Network::connect("/SkinTableTop/skin/fingertip","/OmegaATI/fingertip");
 	Network::connect("/NIDAQmxReader/data/real:o","/OmegaATI/ft");
 
+	
+
+	
+
+	cout < "\nOmega initialised\n";
 	return ret;
 }
 
@@ -170,6 +175,7 @@ bool init_omega()
 		return false;
 	}
 
+	
 	return true;
 }
 
@@ -194,4 +200,9 @@ void OmegaATIThread::updateBias()
 	_forceTorqueData.setBias();
 
 
+}
+
+void OmegaATIThread::stepDownTest()
+{
+	_omegaData.setZ(_omegaData.getZ() - (_stepSize * 10));
 }

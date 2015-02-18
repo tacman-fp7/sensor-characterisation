@@ -31,6 +31,9 @@ int main(int argc, char *argv[]) {
 
 	OmegaATIThread experimentThread(1);
 	experimentThread.start();
+	dhdSleep(2);
+	experimentThread.updateBias();
+	dhdSleep(1);
 
 
 	while(true)
@@ -65,6 +68,10 @@ int main(int argc, char *argv[]) {
 			}
 			else if ( key == 'b' || key == 'B')
 				experimentThread.updateBias();
+			else if ( key == 's')
+				experimentThread.stepDownTest();
+
+			
 		}
 	}
 
