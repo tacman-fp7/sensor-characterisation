@@ -13,7 +13,7 @@ public:
 	void setOutMax(double outMax);
 	void setOutMin(double outMin);
 	void setSetpoint(double setpoint);
-	double update(double curVal, double velocity=NULL);
+	double update(double curVal);
 
 private:
 	inline double P(double error);

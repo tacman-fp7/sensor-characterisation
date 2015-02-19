@@ -14,6 +14,10 @@
 #include "pidController.h"
 #include <ctime>
 
+#define FILTER_OFF
+//#define USE_FORCE_CONTROLLER
+#define USE_POSITION_CONTROLLER
+
 //TODO: Gotta clean it and put it in a config file
 #define OMEGA_UPPER_LIMIT 0.07 //TODO: set them as class variables
 #define OMEGA_LOWER_LIMIT -0.035
@@ -21,15 +25,19 @@
 #define OMEGA_Z_MAX 0.07
 #define OMEGA_Z_SETPOINT -0.5
 
-//#define OMEGA_Z_KP 4 * pow(10, -6)
-//#define OMEGA_Z_KI 2 * pow(10,-11)
-//#define OMEGA_Z_KD 1 * pow(10,-4)
+#ifdef FILTER_ON
+#define OMEGA_Z_KP 4 * pow(10, -6)
+#define OMEGA_Z_KI 2 * pow(10,-11)
+#define OMEGA_Z_KD 1 * pow(10,-4)
+#endif // FILTER_ON
 
-// filter off
+
+
+#ifdef FILTER_OFF
 #define OMEGA_Z_KP 9 * pow(10, -6)
 #define OMEGA_Z_KI 2 * pow(10,-11)
 #define OMEGA_Z_KD 1 * pow(10,-4)
-
+#endif // FILTER_OFF
 
 #define FILTER_WINDOW 10
 #define FT_CHANNELS 6
@@ -266,6 +274,8 @@ public:
 
 private:
 
+	void PositionControl();
+	void ForceControl();
 
 private:
 	BufferedPort<Bottle> _port_ft;
@@ -280,8 +290,10 @@ private:
 	omegaData _omegaData;
 	forceTorqueData _forceTorqueData;
 	PidController _zController;
-	PidController _xController;
-	PidController _yController;
+
+	PidController _xForceController;
+	PidController _yForceController;
+	PidController _zForceController;
 
 	bool _ftNotBiased;
 	double _stepSize;

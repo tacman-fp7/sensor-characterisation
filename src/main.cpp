@@ -49,13 +49,18 @@ int main(int argc, char *argv[]) {
 				if(posCtrl)
 				{
 					experimentThread.UpdateOmegaPosition();
+#ifdef USE_POSITION_CONTROLLER					
 					drdStart();
+#endif
+
 				}
 				else
 				{
+#ifdef USE_POSITION_CONTROLLER
 					drdStop();
 					dhdSleep(1);
-					dhdEnableForce(DHD_ON);
+					dhdEnableForce(DHD_ON);					
+#endif
 				}
 			}
 			else if( key == 'U')

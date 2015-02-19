@@ -21,19 +21,66 @@ using namespace yarp::os;
 
 #define FT_Z 2
 
+void OmegaATIThread::PositionControl()
+{
+
+
+	// Read the force/torque data
+	double ftFx, ftFy, ftFz;
+	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
+	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
+
+	// Read Omega's Position
+	double x, y, z;
+	_omegaData.getAxesPos(&x, &y, &z);
+
+	// Get controller offset
+	double zPos = _zController.update(ftFz);
+
+	// Set the tracking position setpoint
+	drdTrackPos(x, y, z + zPos);
+
+	// Update omega position
+	_omegaData.setZ(z + zPos);
+
+}
+
+void OmegaATIThread::ForceControl()
+{
+	// Read force/torque data
+	double ftFx, ftFy, ftFz;
+	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
+	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
+
+	// Read omega force data
+	double omegaFx, omegaFy, omegaFz;
+	dhdGetForce(&omegaFx, &omegaFy, &omegaFz);
+	printf("Omega Forces: %0.4f, %0.4f, %0.4f\n", omegaFx, omegaFy, omegaFz);
+	
+	// Read omega position data
+	double ox, oy, oz;
+	dhdGetPosition(&ox, &oy, &oz);
+	printf("Omega positions: %0.4f, %0.4f, %0.4f\n", ox, oy, oz);
+
+	//double vx, vy, vz;
+	//dhdGetLinearVelocity(&vx, &vy, &vz);
+
+		//dhdSetForce(fx, fy,fz);
+
+
+
+}
+
 void OmegaATIThread::run()
 {
 
 	//printf("Time: % 3.0f\n",  (std::clock() - _time) / (double)(CLOCKS_PER_SEC / 1000));
 	//_time = std::clock();
 
-	
 	// Read the data, all data should be read here
 	Bottle *ft_input = _port_ft.read(); //  Read f/t data 
 
-
 	_timeStamp.update(); // Update the time stamp for the ports
-
 
 	_forceTorqueData.updateData(ft_input);
 
@@ -43,36 +90,26 @@ void OmegaATIThread::run()
 		_ftNotBiased = false;
 	}
 
-	//drdSetPosTrackParam(0.0005, 0.0005, 0.0005);
-    //double amax, vmax, jerk;
-	//drdGetPosTrackParam(&amax, &vmax, &jerk);
-	//printf("Amax: %f, Vmax: %f, Jerk: %f\n", amax, vmax, jerk);
+#ifdef USE_POSITION_CONTROLLER
+	this->PositionControl();
+#endif
 
-	//double omegaFx, omegaFy, omegaFz;
-	//dhdGetForce(&omegaFx, &omegaFy, &omegaFz);
-	//printf("Omega Forces: %0.4f, %0.4f, %0.4f\n", omegaFx, omegaFy, omegaFz);
-	//double vx, vy, vz;
-	//dhdGetLinearVelocity(&vx, &vy, &vz);
-	double px, py, pz;
-	dhdGetPosition(&px, &py, &pz);
+#ifdef USE_FORCE_CONTROLLER
+	this->ForceControl();
+#endif
+
+
+	
+	
 	//double fx = -400 * px - 20 * vx; //_xController.update(px, vz);  // -400 * px - 20 * vx;
 	//double fy = -400 * py - 20 * vy;
 	//double fz =-4;// -100 * pz;
 
-	double ftFx, ftFy, ftFz;
-	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
-	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
+//	double ftFx, ftFy, ftFz;
+//	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
+//	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
 
-	double zPos = _zController.update(ftFz);
-	//printf("PID gains: % 3.4f, % 3.4f, % 3.4f\n", drdGetEncPGain(), drdGetEncIGain(), drdGetEncDGain());
-	double x, y, z;
-	_omegaData.getAxesPos(&x, &y, &z);
-	//cout << "Desired pos: ";
-	//printf("% 3.4f, % 3.4f, % 3.4f\n", x, y, z);
-	
-	
-	drdTrackPos(x, y, z + zPos);
-	_omegaData.setZ(z + zPos);
+
 	//dhdSetForce(fx, fy,fz);
 
 	//drdMoveToPos(x,y,zPos);
@@ -80,7 +117,15 @@ void OmegaATIThread::run()
 	//drdGetEncMoveParam(&x,&y, &z);
 
 	//printf("A: %f, V: %f, J: %f\n", x,y,z);
-	return;
+	
+
+	//////////////////////////
+    // Move to another thread
+	//////////////////////////
+
+
+
+	/*
 	Bottle& ft_output = _port_ft.prepare();
 	ft_output.clear();
 	ft_output.addDouble(ftFx);
@@ -100,16 +145,10 @@ void OmegaATIThread::run()
 	_port_ftFiltered.setEnvelope(_timeStamp);
 	_port_ftFiltered.write();
 
-	////////double zPos = _zController.update(ftFz);
-	//printf("PID gains: % 3.4f, % 3.4f, % 3.4f\n", drdGetEncPGain(), drdGetEncIGain(), drdGetEncDGain());
-	///////double x, y, z;
-	_omegaData.getAxesPos(&x, &y, &z);
-	//cout << "Desired pos: ";
-	//printf("% 3.4f, % 3.4f, % 3.4f\n", x, y, z);
-	drdMoveToPos(x,y,zPos);
-	//printf("zPos% 3.4f\n", zPos);
-	_omegaData.setZ(zPos);
+	*/
 
+
+/*
 	// Sending the current omega Position
 	double 	drdPos[DHD_MAX_DOF];
 	drdGetPositionAndOrientation(drdPos, NULL);
@@ -121,6 +160,7 @@ void OmegaATIThread::run()
 	_port_omega.write();
 	//printf("Actual  pos: % 3.4f, % 3.4f, % 3.4f\n\n", drdPos[0], drdPos[1], drdPos[2]);
 
+	*/
 
 
 }
@@ -134,7 +174,13 @@ bool OmegaATIThread::threadInit()
 
 
 	// Initialise the omega device
+#ifdef USE_POSITION_CONTROLLER
 	ret = init_omega_drd();
+#endif
+
+#ifdef USE_FORCE_CONTROLLER
+	ret = init_omega_dhd();
+#endif
 
 	_port_ft.open("/OmegaATI/ft");
 	_port_ftFiltered.open("/OmegaATI/ftFiltered");
@@ -152,12 +198,28 @@ bool OmegaATIThread::threadInit()
 	_zController.setOutMin(OMEGA_Z_MIN);
 	_zController.setSetpoint(OMEGA_Z_SETPOINT);
 
-	_xController.setKp(100);
-	_xController.setKd(-20);
-	_xController.setKi(0);
-	_xController.setOutMax(12);
-	_xController.setOutMin(-12);
-	_xController.setSetpoint(0);
+	
+	_xForceController.setKp(100);
+	_xForceController.setKd(-20);
+	_xForceController.setKi(0);
+	_xForceController.setOutMax(12);
+	_xForceController.setOutMin(-12);
+	_xForceController.setSetpoint(0);
+
+	_yForceController.setKp(100);
+	_yForceController.setKd(-20);
+	_yForceController.setKi(0);
+	_yForceController.setOutMax(12);
+	_yForceController.setOutMin(-12);
+	_yForceController.setSetpoint(0);
+
+	_zForceController.setKp(100);
+	_zForceController.setKd(-20);
+	_zForceController.setKi(0);
+	_zForceController.setOutMax(12);
+	_zForceController.setOutMin(-12);
+	_zForceController.setSetpoint(0);
+
 
 	cout < "\nOmega initialised\n";
 	return ret;
@@ -166,12 +228,19 @@ bool OmegaATIThread::threadInit()
 void OmegaATIThread::threadRelease()
 {
 
+
 	// Close the Omega haptic device
+#ifdef USE_POSITION_CONTROLLER
 	drdStop();
 	drdClose();
+#endif // USE_POSITION_CONTROLLER
 
-	//dhdStop();
-	//dhdClose();
+#ifdef USE_FORCE_CONTROLLER
+	dhdEnableForce(DHD_OFF);
+	dhdSleep(2);
+	dhdStop();
+	dhdClose();
+#endif // USE_FORCE_CONTROLLER
 }
 
 
@@ -192,7 +261,7 @@ bool init_omega_dhd()
 	// identify device
 	printf ("%s device detected\n\n", dhdGetSystemName());
 
-	
+	dhdEnableForce(DHD_ON);
 	
 	
 }

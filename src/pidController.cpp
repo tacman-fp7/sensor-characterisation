@@ -69,7 +69,7 @@ void PidController::setOutMin(double outMin)
 }
 
 
-double PidController::update(double curVal, double velocity)
+double PidController::update(double curVal)
 {
 
 	_tSample = 1; //TODO: fix this later to actual number of milliseconds
