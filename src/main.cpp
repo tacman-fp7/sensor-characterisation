@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
 	OmegaATIThread experimentThread(1);
 	experimentThread.start();
 	dhdSleep(2);
-	experimentThread.updateBias();
-	dhdSleep(1);
+	//experimentThread.updateBias();
+	//dhdSleep(1);
 
 
 	while(true)

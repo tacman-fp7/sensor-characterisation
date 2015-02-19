@@ -6,13 +6,31 @@
 #include <yarp/os/Stamp.h>
 #include <yarp/os/BufferedPort.h>
 #include <yarp/os/Mutex.h>
+#include <yarp/dev/ControlBoardPid.h>
 #include <iostream>
 #include "drdc.h"
 #include <queue>
 #include <array>
+#include "pidController.h"
+#include <ctime>
 
-#define OMEGA_UPPER_LIMIT 0.08 //TODO: set them as class variables
+//TODO: Gotta clean it and put it in a config file
+#define OMEGA_UPPER_LIMIT 0.07 //TODO: set them as class variables
 #define OMEGA_LOWER_LIMIT -0.035
+#define OMEGA_Z_MIN -0.035
+#define OMEGA_Z_MAX 0.07
+#define OMEGA_Z_SETPOINT -0.5
+
+//#define OMEGA_Z_KP 4 * pow(10, -6)
+//#define OMEGA_Z_KI 2 * pow(10,-11)
+//#define OMEGA_Z_KD 1 * pow(10,-4)
+
+// filter off
+#define OMEGA_Z_KP 9 * pow(10, -6)
+#define OMEGA_Z_KI 2 * pow(10,-11)
+#define OMEGA_Z_KD 1 * pow(10,-4)
+
+
 #define FILTER_WINDOW 10
 #define FT_CHANNELS 6
 
@@ -20,8 +38,8 @@
 
 using namespace yarp::os;
 using namespace std;
-bool init_omega(); // routine to initialise omega haptic device
-
+bool init_omega_dhd(); // routine to initialise omega haptic device
+bool init_omega_drd();
 // Storage for omegaData with accessors and mutators
 struct omegaData
 {
@@ -261,6 +279,12 @@ private:
 
 	omegaData _omegaData;
 	forceTorqueData _forceTorqueData;
+	PidController _zController;
+	PidController _xController;
+	PidController _yController;
+
+	bool _ftNotBiased;
 	double _stepSize;
+	std::clock_t _time;
 };
 

@@ -13,7 +13,8 @@
 #include <string>
 #include <iostream>
 #include <vector>
-
+#include "pidController.h"
+#include <ctime>
 using namespace std;
 using namespace yarp::os;
 
@@ -23,27 +24,63 @@ using namespace yarp::os;
 void OmegaATIThread::run()
 {
 
+	//printf("Time: % 3.0f\n",  (std::clock() - _time) / (double)(CLOCKS_PER_SEC / 1000));
+	//_time = std::clock();
+
+	
 	// Read the data, all data should be read here
 	Bottle *ft_input = _port_ft.read(); //  Read f/t data 
-	Bottle *fingertip_input = _port_fingertip.read(); // Read fingertip data 
+
 
 	_timeStamp.update(); // Update the time stamp for the ports
 
-	if(fingertip_input == NULL)
-	{
-		cout << "Warning! No finger data." << endl;
-		return;
-	}
 
 	_forceTorqueData.updateData(ft_input);
 
-	double omegaFx, omegaFy, omegaFz;
-	dhdGetForce(&omegaFx, &omegaFy, &omegaFz);
+	if(_ftNotBiased)
+	{
+		updateBias();
+		_ftNotBiased = false;
+	}
+
+	//drdSetPosTrackParam(0.0005, 0.0005, 0.0005);
+    //double amax, vmax, jerk;
+	//drdGetPosTrackParam(&amax, &vmax, &jerk);
+	//printf("Amax: %f, Vmax: %f, Jerk: %f\n", amax, vmax, jerk);
+
+	//double omegaFx, omegaFy, omegaFz;
+	//dhdGetForce(&omegaFx, &omegaFy, &omegaFz);
 	//printf("Omega Forces: %0.4f, %0.4f, %0.4f\n", omegaFx, omegaFy, omegaFz);
+	//double vx, vy, vz;
+	//dhdGetLinearVelocity(&vx, &vy, &vz);
+	double px, py, pz;
+	dhdGetPosition(&px, &py, &pz);
+	//double fx = -400 * px - 20 * vx; //_xController.update(px, vz);  // -400 * px - 20 * vx;
+	//double fy = -400 * py - 20 * vy;
+	//double fz =-4;// -100 * pz;
 
 	double ftFx, ftFy, ftFz;
 	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
 	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
+
+	double zPos = _zController.update(ftFz);
+	//printf("PID gains: % 3.4f, % 3.4f, % 3.4f\n", drdGetEncPGain(), drdGetEncIGain(), drdGetEncDGain());
+	double x, y, z;
+	_omegaData.getAxesPos(&x, &y, &z);
+	//cout << "Desired pos: ";
+	//printf("% 3.4f, % 3.4f, % 3.4f\n", x, y, z);
+	
+	
+	drdTrackPos(x, y, z + zPos);
+	_omegaData.setZ(z + zPos);
+	//dhdSetForce(fx, fy,fz);
+
+	//drdMoveToPos(x,y,zPos);
+
+	//drdGetEncMoveParam(&x,&y, &z);
+
+	//printf("A: %f, V: %f, J: %f\n", x,y,z);
+	return;
 	Bottle& ft_output = _port_ft.prepare();
 	ft_output.clear();
 	ft_output.addDouble(ftFx);
@@ -63,12 +100,15 @@ void OmegaATIThread::run()
 	_port_ftFiltered.setEnvelope(_timeStamp);
 	_port_ftFiltered.write();
 
+	////////double zPos = _zController.update(ftFz);
 	//printf("PID gains: % 3.4f, % 3.4f, % 3.4f\n", drdGetEncPGain(), drdGetEncIGain(), drdGetEncDGain());
-	double x, y, z;
+	///////double x, y, z;
 	_omegaData.getAxesPos(&x, &y, &z);
 	//cout << "Desired pos: ";
 	//printf("% 3.4f, % 3.4f, % 3.4f\n", x, y, z);
-	drdMoveToPos(x,y,z);
+	drdMoveToPos(x,y,zPos);
+	//printf("zPos% 3.4f\n", zPos);
+	_omegaData.setZ(zPos);
 
 	// Sending the current omega Position
 	double 	drdPos[DHD_MAX_DOF];
@@ -89,11 +129,12 @@ bool OmegaATIThread::threadInit()
 {
 
 	bool ret = true;
+	_ftNotBiased = true;
 	_stepSize = 0.0002;
 
 
 	// Initialise the omega device
-	ret = init_omega();
+	ret = init_omega_drd();
 
 	_port_ft.open("/OmegaATI/ft");
 	_port_ftFiltered.open("/OmegaATI/ftFiltered");
@@ -103,9 +144,20 @@ bool OmegaATIThread::threadInit()
 	Network::connect("/SkinTableTop/skin/fingertip","/OmegaATI/fingertip");
 	Network::connect("/NIDAQmxReader/data/real:o","/OmegaATI/ft");
 
-	
+	// PID 
+	_zController.setKp(OMEGA_Z_KP);
+	_zController.setKi(OMEGA_Z_KI);
+	_zController.setKd(OMEGA_Z_KD);
+	_zController.setOutMax(OMEGA_Z_MAX);
+	_zController.setOutMin(OMEGA_Z_MIN);
+	_zController.setSetpoint(OMEGA_Z_SETPOINT);
 
-	
+	_xController.setKp(100);
+	_xController.setKd(-20);
+	_xController.setKi(0);
+	_xController.setOutMax(12);
+	_xController.setOutMin(-12);
+	_xController.setSetpoint(0);
 
 	cout < "\nOmega initialised\n";
 	return ret;
@@ -118,11 +170,35 @@ void OmegaATIThread::threadRelease()
 	drdStop();
 	drdClose();
 
+	//dhdStop();
+	//dhdClose();
 }
 
 
+bool init_omega_dhd()
+{
+	// Configuration of the Omega device
+	dhdEnableExpertMode ();
+
+	
+	// open the first available device
+	if(dhdOpen () < 0)
+	{
+		printf ("error: cannot open device (%s)\n", dhdErrorGetLastStr());
+		dhdSleep (2.0);
+		return false;
+	}
+
+	// identify device
+	printf ("%s device detected\n\n", dhdGetSystemName());
+
+	
+	
+	
+}
+
 // Initialise the omega device
-bool init_omega()
+bool init_omega_drd()
 {
 	// Configuration of the Omega device
 	dhdEnableExpertMode ();
@@ -165,7 +241,7 @@ bool init_omega()
 	}
 
 	drdSetEncPGain(8); //TDODO: config file parameter
-	drdSetEncIGain(32);
+	drdSetEncIGain(16);
 
 	// goto workspace center
 	if (drdMoveToPos (0.0, 0.0, 0.0) < 0) 
@@ -175,7 +251,15 @@ bool init_omega()
 		return false;
 	}
 
-	
+	//double amax, vmax, jerk;
+	//drdGetPosTrackParam(&amax, &vmax, &jerk);
+	//printf("Amax: % 2.3f, Vmax: % 2.3f, Jerk: % 2.3f\n", amax, vmax, jerk);
+	//drdSetPosTrackParam(amax, vmax/1000, jerk/1000);
+	//drdGetPosTrackParam(&amax, &vmax, &jerk);
+	//printf("Amax: % 2.3f, Vmax: % 2.3f, Jerk: % 2.3f\n", amax, vmax, jerk);
+
+	drdEnableFilter(false);
+
 	return true;
 }
 
@@ -198,6 +282,7 @@ void OmegaATIThread::updateBias()
 {
 	_omegaData.setBias();
 	_forceTorqueData.setBias();
+	_ftNotBiased = false;
 
 
 }
