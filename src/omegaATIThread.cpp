@@ -28,7 +28,7 @@ void OmegaATIThread::PositionControl()
 	// Read the force/torque data
 	double ftFx, ftFy, ftFz;
 	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
-	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
+	//printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
 
 	// Read Omega's Position
 	double x, y, z;
@@ -47,7 +47,7 @@ void OmegaATIThread::PositionControl()
 
 void OmegaATIThread::ForceControl()
 {
-	// Read force/torque data
+	// Read ATI force/torque data
 	double ftFx, ftFy, ftFz;
 	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
 	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
@@ -55,13 +55,49 @@ void OmegaATIThread::ForceControl()
 	// Read omega force data
 	double omegaFx, omegaFy, omegaFz;
 	dhdGetForce(&omegaFx, &omegaFy, &omegaFz);
-	printf("Omega Forces: %0.4f, %0.4f, %0.4f\n", omegaFx, omegaFy, omegaFz);
+	//printf("Omega F: % 3.4f, % 3.4f, % 3.4f\n", omegaFx, omegaFy, omegaFz);
 	
 	// Read omega position data
 	double ox, oy, oz;
 	dhdGetPosition(&ox, &oy, &oz);
-	printf("Omega positions: %0.4f, %0.4f, %0.4f\n", ox, oy, oz);
+	//printf("Omega P: % 3.4f, % 3.4f, % 3.4f\n", ox, oy, oz);
 
+	//double vx, vy, vz;
+	//dhdGetLinearVelocity(&vx, &vy, &vz);
+	
+	double velPos[DHD_MAX_DOF];
+	drdGetVelocity(velPos);
+
+	//double omdPx, omdPy, omdPz; 
+	//_omegaData.getAxesPos(&omdPx, &omdPy, &omdPz);
+
+	
+
+	double fx = _xForceController.update(ox, velPos[0]);
+	double fy = _yForceController.update(oy, velPos[1]);
+	//double fz = _zForceController.update(oz, velPos[2]);
+	
+	double fz = _zOmegaFTController.getSetpoint() + _zOmegaFTController.update(ftFz);
+
+	double omFx, omFy, omFz;
+	_omegaForce.getFroces(&omFx, &omFy, &omFz);
+
+	double f[8];
+	memset(f, 0, sizeof(f));
+	f[0] = fx;
+	f[1] = fy;
+	f[2] = fz;
+
+	drdSetForceAndTorqueAndGripperForce(f);
+	
+	
+	
+	_omegaForce.setForces(
+				omFx,
+		        omFy,
+				omFz);
+				
+	//double fZ = _xForceController(ftFz
 	//double vx, vy, vz;
 	//dhdGetLinearVelocity(&vx, &vy, &vz);
 
@@ -74,8 +110,8 @@ void OmegaATIThread::ForceControl()
 void OmegaATIThread::run()
 {
 
-	//printf("Time: % 3.0f\n",  (std::clock() - _time) / (double)(CLOCKS_PER_SEC / 1000));
-	//_time = std::clock();
+	printf("Time: % 3.0f\n",  (std::clock() - _time) / (double)(CLOCKS_PER_SEC / 1000));
+	_time = std::clock();
 
 	// Read the data, all data should be read here
 	Bottle *ft_input = _port_ft.read(); //  Read f/t data 
@@ -199,27 +235,36 @@ bool OmegaATIThread::threadInit()
 	_zController.setSetpoint(OMEGA_Z_SETPOINT);
 
 	
-	_xForceController.setKp(100);
-	_xForceController.setKd(-20);
-	_xForceController.setKi(0);
-	_xForceController.setOutMax(12);
-	_xForceController.setOutMin(-12);
+	_xForceController.setKp(FORCE_KP);
+	_xForceController.setKd(FORCE_KD);
+	_xForceController.setKi(FORCE_KI);
+	_xForceController.setOutMax(OMEGA_FORCE_MAX);
+	_xForceController.setOutMin(-OMEGA_FORCE_MAX);
 	_xForceController.setSetpoint(0);
 
-	_yForceController.setKp(100);
-	_yForceController.setKd(-20);
-	_yForceController.setKi(0);
-	_yForceController.setOutMax(12);
-	_yForceController.setOutMin(-12);
+	_yForceController.setKp(FORCE_KP);
+	_yForceController.setKd(FORCE_KD);
+	_yForceController.setKi(FORCE_KI);
+	_yForceController.setOutMax(OMEGA_FORCE_MAX);
+	_yForceController.setOutMin(-OMEGA_FORCE_MAX);
 	_yForceController.setSetpoint(0);
 
-	_zForceController.setKp(100);
-	_zForceController.setKd(-20);
-	_zForceController.setKi(0);
-	_zForceController.setOutMax(12);
-	_zForceController.setOutMin(-12);
+	_zForceController.setKp(FORCE_KP);
+	_zForceController.setKd(FORCE_KD);
+	_zForceController.setKi(FORCE_KI);
+	_zForceController.setOutMax(OMEGA_FORCE_MAX);
+	_zForceController.setOutMin(-OMEGA_FORCE_MAX);
 	_zForceController.setSetpoint(0);
 
+	_zOmegaFTController.setKp(FT_FORCE_KP);
+	_zOmegaFTController.setKd(FT_FORCE_KD);
+	_zOmegaFTController.setKi(FT_FORCE_KI);
+	_zOmegaFTController.setOutMax(FT_FORCE_MAX);
+	_zOmegaFTController.setOutMin(-FT_FORCE_MAX);
+	_zOmegaFTController.setSetpoint(FT_SETPOINT);
+
+	
+	this->UpdateOmegaPosition();
 
 	cout < "\nOmega initialised\n";
 	return ret;
@@ -237,7 +282,7 @@ void OmegaATIThread::threadRelease()
 
 #ifdef USE_FORCE_CONTROLLER
 	dhdEnableForce(DHD_OFF);
-	dhdSleep(2);
+	dhdSleep(1);
 	dhdStop();
 	dhdClose();
 #endif // USE_FORCE_CONTROLLER
@@ -246,6 +291,68 @@ void OmegaATIThread::threadRelease()
 
 bool init_omega_dhd()
 {
+
+
+	// Configuration of the Omega device
+	dhdEnableExpertMode ();
+
+
+	// open the first available device
+	if(drdOpen () < 0)
+	{
+		printf ("error: cannot open device (%s)\n", dhdErrorGetLastStr());
+		dhdSleep (2.0);
+		return false;
+	}
+
+	if (!drdIsSupported()) 
+	{
+		printf ("unsupported device\n");
+		printf ("exiting...\n");
+		dhdSleep (2.0);
+		drdClose ();
+		return false;
+	}
+
+	// identify device
+	printf ("%s device detected\n\n", dhdGetSystemName());
+
+	// start robot control loop
+	if (drdStart() < 0) 
+	{
+		printf ("error: control loop failed to start properly (%s)\n", dhdErrorGetLastStr ());
+		dhdSleep (2.0);
+		return false;
+	}
+
+	drdSetEncPGain(8); //TDODO: config file parameter
+	drdSetEncIGain(16);
+
+	
+	// goto workspace
+	//double position[DHD_MAX_DOF], rot[3][3];
+	
+	//drdGetPositionAndOrientation(position, rot);
+
+	//if (drdMoveToPos(position[0], position[1], position[2]) < 0) 
+	//{
+		//printf ("error: failed to move to central position (%s)\n", dhdErrorGetLastStr ());
+		//dhdSleep (2.0);
+		//return false;
+	//}
+
+	//while(drdIsMoving())
+	//	__nop;
+	
+
+	drdRegulatePos(false);
+	drdRegulateGrip(false);
+	drdRegulateRot(false);
+
+	drdEnableFilter(false);
+
+
+	/*
 	// Configuration of the Omega device
 	dhdEnableExpertMode ();
 
@@ -262,7 +369,10 @@ bool init_omega_dhd()
 	printf ("%s device detected\n\n", dhdGetSystemName());
 
 	dhdEnableForce(DHD_ON);
+
+	dhdSleep(1); */
 	
+	return true;
 	
 }
 
@@ -312,8 +422,10 @@ bool init_omega_drd()
 	drdSetEncPGain(8); //TDODO: config file parameter
 	drdSetEncIGain(16);
 
-	// goto workspace center
-	if (drdMoveToPos (0.0, 0.0, 0.0) < 0) 
+	double px, py, pz;
+	dhdGetPosition(&px, &py, &pz);
+	
+	if (drdMoveToPos (px, py, pz) < 0) 
 	{
 		printf ("error: failed to move to central position (%s)\n", dhdErrorGetLastStr ());
 		dhdSleep (2.0);
@@ -335,6 +447,13 @@ bool init_omega_drd()
 void OmegaATIThread::UpdateOmegaPosition()
 {
 	_omegaData.updateData();
+
+	double px, py, pz;
+	_omegaData.getAxesPos(&px, &py, &pz);
+	_xForceController.setSetpoint(px);
+	_yForceController.setSetpoint(py);
+	_zForceController.setSetpoint(pz);
+
 }
 
 void OmegaATIThread::stepUp()

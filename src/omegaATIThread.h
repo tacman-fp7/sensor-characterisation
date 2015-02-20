@@ -15,8 +15,8 @@
 #include <ctime>
 
 #define FILTER_OFF
-//#define USE_FORCE_CONTROLLER
-#define USE_POSITION_CONTROLLER
+#define USE_FORCE_CONTROLLER
+//#define USE_POSITION_CONTROLLER
 
 //TODO: Gotta clean it and put it in a config file
 #define OMEGA_UPPER_LIMIT 0.07 //TODO: set them as class variables
@@ -39,6 +39,19 @@
 #define OMEGA_Z_KD 1 * pow(10,-4)
 #endif // FILTER_OFF
 
+#define FORCE_KP 1000
+#define FORCE_KI 20
+#define FORCE_KD 20 
+#define OMEGA_FORCE_MAX 12
+
+#define FT_FORCE_KP 0.5
+#define FT_FORCE_KI 0.005
+#define FT_FORCE_KD 0.01
+#define FT_FORCE_MAX 8
+#define FT_SETPOINT -4
+
+
+
 #define FILTER_WINDOW 10
 #define FT_CHANNELS 6
 
@@ -48,6 +61,28 @@ using namespace yarp::os;
 using namespace std;
 bool init_omega_dhd(); // routine to initialise omega haptic device
 bool init_omega_drd();
+
+struct omegaForce
+{
+	omegaForce(): _fx(0), _fy(0), _fz(0){};
+
+	void setForces(double fx, double fy, double fz)
+	{
+		_fx = fx;
+		_fy = fy;
+		fz = fz;
+	}
+	void getFroces(double* fx, double* fy, double* fz)
+	{
+		*fx = _fx;
+		*fy = _fy;
+		*fz = _fz;
+	}
+private:
+	double _fx;
+	double _fy;
+	double _fz;
+};
 // Storage for omegaData with accessors and mutators
 struct omegaData
 {
@@ -288,12 +323,16 @@ private:
 	//omegaData _omegaData_init; // Storage for initial position
 
 	omegaData _omegaData;
+	omegaForce _omegaForce;
+
 	forceTorqueData _forceTorqueData;
 	PidController _zController;
 
 	PidController _xForceController;
 	PidController _yForceController;
 	PidController _zForceController;
+
+	PidController _zOmegaFTController;
 
 	bool _ftNotBiased;
 	double _stepSize;

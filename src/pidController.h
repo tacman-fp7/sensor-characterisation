@@ -13,7 +13,9 @@ public:
 	void setOutMax(double outMax);
 	void setOutMin(double outMin);
 	void setSetpoint(double setpoint);
+	double getSetpoint();
 	double update(double curVal);
+	double update(double curVal, double velocity);
 
 private:
 	inline double P(double error);
@@ -30,6 +32,7 @@ private:
 	clock_t _clkTicks;
 	time_t _timer;
 	double _tSample;
+	double _integral;
 	
 };
 

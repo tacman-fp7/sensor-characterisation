@@ -48,7 +48,10 @@ int main(int argc, char *argv[]) {
 				posCtrl = !posCtrl;
 				if(posCtrl)
 				{
+					
 					experimentThread.UpdateOmegaPosition();
+					dhdSleep(1);
+					experimentThread.resume();
 #ifdef USE_POSITION_CONTROLLER					
 					drdStart();
 #endif
@@ -56,6 +59,8 @@ int main(int argc, char *argv[]) {
 				}
 				else
 				{
+					experimentThread.suspend();
+					dhdSleep(1);
 #ifdef USE_POSITION_CONTROLLER
 					drdStop();
 					dhdSleep(1);
