@@ -20,8 +20,8 @@ set(FORCE_DIMENSION_HOME "C:/Program\ Files/Force\ Dimension/sdk-3.5.2")
 # ###########################################################################
 # The included source code
 # ###########################################################################
-set(HEADERS src/omegaATIThread.h src/pidController.h src/omegaATIPubThread.h src/forceTorqueData.h)
-set(SOURCES src/main.cpp src/omegaATIThread.cpp src/pidController.cpp src/omegaATIPubThread.cpp src/forceTorqueData.cpp)
+set(HEADERS src/omegaATIThread.h src/pidController.h src/omegaATIPubThread.h src/forceTorqueData.h src/omegaData.h)
+set(SOURCES src/main.cpp src/omegaATIThread.cpp src/pidController.cpp src/omegaATIPubThread.cpp src/forceTorqueData.cpp src/omegaData.cpp)
 
 # ###########################################################################	
 # Project Version

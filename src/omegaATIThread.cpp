@@ -114,17 +114,17 @@ void OmegaATIThread::run()
 	_time = std::clock();
 
 	// Read the data, all data should be read here
-	Bottle *ft_input = _port_ft.read(); //  Read f/t data 
+	//Bottle *ft_input = _port_ft.read(); //  Read f/t data 
 
-	_timeStamp.update(); // Update the time stamp for the ports
+	//_timeStamp.update(); // Update the time stamp for the ports
 
-	_forceTorqueData.updateData(ft_input);
-
+	_forceTorqueData.updateData();
 	if(_ftNotBiased)
 	{
 		updateBias();
 		_ftNotBiased = false;
 	}
+	_omegaATIPubThread->publishData();
 
 #ifdef USE_POSITION_CONTROLLER
 	this->PositionControl();
@@ -135,68 +135,6 @@ void OmegaATIThread::run()
 #endif
 
 
-	
-	
-	//double fx = -400 * px - 20 * vx; //_xController.update(px, vz);  // -400 * px - 20 * vx;
-	//double fy = -400 * py - 20 * vy;
-	//double fz =-4;// -100 * pz;
-
-//	double ftFx, ftFy, ftFz;
-//	_forceTorqueData.getBiasedForces(&ftFx, &ftFy, &ftFz);
-//	printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFx, ftFy, ftFz);
-
-
-	//dhdSetForce(fx, fy,fz);
-
-	//drdMoveToPos(x,y,zPos);
-
-	//drdGetEncMoveParam(&x,&y, &z);
-
-	//printf("A: %f, V: %f, J: %f\n", x,y,z);
-	
-
-	//////////////////////////
-    // Move to another thread
-	//////////////////////////
-
-
-
-	/*
-	Bottle& ft_output = _port_ft.prepare();
-	ft_output.clear();
-	ft_output.addDouble(ftFx);
-	ft_output.addDouble(ftFy);
-	ft_output.addDouble(ftFz);
-	_port_ft.setEnvelope(_timeStamp);
-	_port_ft.write();
-
-	double ftFxFilt, ftFyFilt, ftFzFilt;
-	_forceTorqueData.getFilteredForces(&ftFxFilt, &ftFyFilt, &ftFzFilt);
-	//printf("ATI Fx: % 3.4f, Fy: % 3.4f, Fz: % 3.4f\n", ftFxFilt, ftFyFilt, ftFzFilt);
-	Bottle& ftFiltered_output = _port_ftFiltered.prepare();
-	ftFiltered_output.clear();
-	ftFiltered_output.addDouble(ftFxFilt);
-	ftFiltered_output.addDouble(ftFyFilt);
-	ftFiltered_output.addDouble(ftFzFilt);
-	_port_ftFiltered.setEnvelope(_timeStamp);
-	_port_ftFiltered.write();
-
-	*/
-
-
-/*
-	// Sending the current omega Position
-	double 	drdPos[DHD_MAX_DOF];
-	drdGetPositionAndOrientation(drdPos, NULL);
-	Bottle& omegaOutput = _port_omega.prepare();
-	omegaOutput.clear();
-	for(int i = 0; i < 3; i++)
-		omegaOutput.addDouble(drdPos[i]);
-	_port_omega.setEnvelope(_timeStamp);
-	_port_omega.write();
-	//printf("Actual  pos: % 3.4f, % 3.4f, % 3.4f\n\n", drdPos[0], drdPos[1], drdPos[2]);
-
-	*/
 
 
 }
@@ -218,13 +156,10 @@ bool OmegaATIThread::threadInit()
 	ret = init_omega_dhd();
 #endif
 
-	_port_ft.open("/OmegaATI/ft");
-	_port_ftFiltered.open("/OmegaATI/ftFiltered");
-	_port_fingertip.open("/OmegaATI/fingertip");
-	_port_omega.open("/OmegaATI/omegaPosition");
 
-	Network::connect("/SkinTableTop/skin/fingertip","/OmegaATI/fingertip");
-	Network::connect("/NIDAQmxReader/data/real:o","/OmegaATI/ft");
+	_omegaATIPubThread = new OmegaATIPubThread(1, &_forceTorqueData, &_omegaData);
+	_omegaATIPubThread->start();
+
 
 	// PID 
 	_zController.setKp(OMEGA_Z_KP);
@@ -286,6 +221,10 @@ void OmegaATIThread::threadRelease()
 	dhdStop();
 	dhdClose();
 #endif // USE_FORCE_CONTROLLER
+
+	_omegaATIPubThread->stop();
+	_omegaATIPubThread->threadRelease();
+	delete _omegaATIPubThread;
 }
 
 

@@ -32,9 +32,8 @@ int main(int argc, char *argv[]) {
 	OmegaATIThread experimentThread(1);
 	experimentThread.start();
 	dhdSleep(2);
-	//experimentThread.updateBias();
-	//dhdSleep(1);
-	
+
+
 
 	while(true)
 	{
@@ -48,7 +47,7 @@ int main(int argc, char *argv[]) {
 				posCtrl = !posCtrl;
 				if(posCtrl)
 				{
-					
+
 					experimentThread.UpdateOmegaPosition();
 					dhdSleep(1);
 					experimentThread.resume();
@@ -59,8 +58,15 @@ int main(int argc, char *argv[]) {
 				}
 				else
 				{
+
 					experimentThread.suspend();
-					dhdSleep(1);
+					dhdSleep(0.1);
+
+					double f[8];
+					memset(f, 0, sizeof(f));
+					f[2] = -0.5;
+					drdSetForceAndTorqueAndGripperForce(f);
+
 #ifdef USE_POSITION_CONTROLLER
 					drdStop();
 					dhdSleep(1);
@@ -81,7 +87,7 @@ int main(int argc, char *argv[]) {
 			else if ( key == 's')
 				experimentThread.stepDownTest();
 
-			
+
 		}
 	}
 

@@ -7,23 +7,24 @@
 #include <yarp/os/BufferedPort.h>
 #include <yarp/os/Stamp.h>
 
+
 #define FILTER_WINDOW 10
 #define FT_CHANNELS 6
 
 using namespace yarp::os;
 using namespace std;
 
-class forceTorqueData
+class ForceTorqueData
 {
 public:
-	forceTorqueData();
-	bool updateData(Bottle *ft_input);
+	ForceTorqueData();
+	bool updateData();
 	void setForces(double fx, double fy, double fz);
 	void setTorques(double tx, double ty, double tz);
 	void setBias();
 	void setBias(double fxBias, double fyBias, double fzBias);
 	void getForces(double *fx, double *fy, double *fz);
-
+	void publishData();
 	
 	void getBiasedForces(double *fx, double *fy, double *fz)
 	{
@@ -56,5 +57,8 @@ private:
 	queue< array<double, FT_CHANNELS> > _filterBuffer;
 	Mutex _mutex;
 	yarp::os::Stamp _timeStamp;
+
+	BufferedPort<Bottle> _port_ft;
+	BufferedPort<Bottle> _port_ftFiltered;
 
 };
