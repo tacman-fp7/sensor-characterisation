@@ -22,12 +22,9 @@ set(FORCE_DIMENSION_HOME "C:/Program\ Files/Force\ Dimension/sdk-3.5.2")
 # ###########################################################################
 set(HEADERS src/omegaATIThread.h src/pidController.h src/omegaATIPubThread.h
             src/forceTorqueData.h src/omegaData.h 
-			src/omegaATIForceController.h src/omegaATIPositionController.h
 			src/omegaFTHybridController.h src/omegaForceController.h)
-set(SOURCES src/main.cpp src/omegaATIThread.cpp src/pidController.cpp src/omegaATIController.cpp
-			src/omegaATIPubThread.cpp src/forceTorqueData.cpp src/omegaData.cpp
-			src/omegaATIForceController.cpp src/omegaATIPositionController.cpp
-			src/omegaFTHybridController.cpp )
+set(SOURCES src/main.cpp src/omegaATIThread.cpp src/pidController.cpp 
+			src/omegaATIPubThread.cpp src/forceTorqueData.cpp src/omegaData.cpp)
 
 # ###########################################################################	
 # Project Version
