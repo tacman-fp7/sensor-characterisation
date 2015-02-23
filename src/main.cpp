@@ -11,12 +11,7 @@
 using namespace std;
 using namespace yarp::os;
 
-
-
-
-
 int main(int argc, char *argv[]) {
-
 
 	Network yarp;
 	bool posCtrl = true;
@@ -26,14 +21,9 @@ int main(int argc, char *argv[]) {
 		return false;
 	}
 
-
-
-
 	OmegaATIThread experimentThread(1);
 	experimentThread.start();
 	dhdSleep(2);
-
-
 
 	while(true)
 	{
@@ -87,12 +77,9 @@ int main(int argc, char *argv[]) {
 			else if ( key == 's')
 				experimentThread.stepDownTest();
 
-
 		}
 	}
-
 	experimentThread.stop();
-
 
 	return 0;
 }

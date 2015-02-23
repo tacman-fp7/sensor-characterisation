@@ -14,7 +14,7 @@ void OmegaATIPubThread::run()
 	_forceTorqueData->publishData();
 	_omegaData->publishData();
 
-	printf("Data being published\n");
+	
 
 }
 

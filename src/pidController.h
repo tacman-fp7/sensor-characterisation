@@ -7,6 +7,7 @@ class PidController
 
 public:
 	PidController();
+	virtual double update(double omegaPosition, double omegaVelocity, double ftValue){return 0;};
 	void setKp(double Kp);
 	void setKi(double Ki);
 	void setKd(double Kd);
@@ -14,6 +15,8 @@ public:
 	void setOutMin(double outMin);
 	void setSetpoint(double setpoint);
 	double getSetpoint();
+
+
 	double update(double curVal);
 	double update(double curVal, double velocity);
 
@@ -22,11 +25,13 @@ private:
 	inline double I(double error);
 	inline double D(double error);
 
+protected:
+	double _setpoint;
+
 private:
 	double _Kp;
 	double _Ki;
 	double _Kd;
-	double _setpoint;
 	double _outMax;
 	double _outMin;
 	clock_t _clkTicks;

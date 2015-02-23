@@ -4,9 +4,7 @@
 #include <yarp/os/BufferedPort.h>
 #include <yarp/os/Time.h>
 #include <yarp/os/Stamp.h>
-//#include <yarp/os/BufferedPort.h>
 #include <yarp/os/Mutex.h>
-//#include <yarp/dev/ControlBoardPid.h>
 #include <iostream>
 #include "drdc.h"
 #include <queue>
@@ -17,7 +15,10 @@
 
 #include "omegaATIPubThread.h"
 #include "omegaData.h"
+#include "omegaFTHybridController.h"
+#include "omegaForceController.h"
 
+#undef FILTER_ON
 #define FILTER_OFF
 #define USE_FORCE_CONTROLLER
 //#define USE_POSITION_CONTROLLER
@@ -65,35 +66,16 @@ using namespace yarp::os;
 using namespace std;
 bool init_omega_dhd(); // routine to initialise omega haptic device
 bool init_omega_drd();
-
-struct omegaForce
-{
-	omegaForce(): _fx(0), _fy(0), _fz(0){};
-
-	void setForces(double fx, double fy, double fz)
-	{
-		_fx = fx;
-		_fy = fy;
-		fz = fz;
-	}
-	void getFroces(double* fx, double* fy, double* fz)
-	{
-		*fx = _fx;
-		*fy = _fy;
-		*fz = _fz;
-	}
-private:
-	double _fx;
-	double _fy;
-	double _fz;
-};
-
+bool init_omega();
 
 
 class OmegaATIThread: public RateThread
 {
 public:
-	OmegaATIThread(int period):RateThread(period){_omegaATIPubThread = NULL;};
+	OmegaATIThread(int period):RateThread(period)
+	{_omegaATIPubThread = NULL;
+	_zController = NULL;
+	};
 	void UpdateOmegaPosition();
 	void stepUp();
 	void stepDownTest();
@@ -111,19 +93,30 @@ private:
 private:
 
 	OmegaData _omegaData;
-	omegaForce _omegaForce;
+
 
 	ForceTorqueData _forceTorqueData;
-	PidController _zController;
+	PidController _zpController;
 
-	PidController _xForceController;
-	PidController _yForceController;
-	PidController _zForceController;
 
-	PidController _zOmegaFTController;
+	OmegaForceController _xForceController;
+	OmegaForceController _yForceController;
+	OmegaForceController _zForceController;
+
+	//  PidController _xForceController;
+	//	PidController _yForceController;
+	//	PidController _zForceController;
+
+	//PidController _zOmegaFTController;
+	OmegaFTHybridController _zOmegaFTController;
+
+	// Decide during runtime which subcontroller to choose
+	PidController* _xController;
+	PidController* _yController;
+	PidController* _zController;
 
 	OmegaATIPubThread* _omegaATIPubThread;
-	
+
 	bool _ftNotBiased;
 	double _stepSize;
 	std::clock_t _time;
