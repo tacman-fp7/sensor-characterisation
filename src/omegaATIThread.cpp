@@ -19,6 +19,19 @@ using namespace std;
 using namespace yarp::os;
 
 
+void OmegaATIThread::setPositionControl()
+{
+	_positionControl = true;
+	this->OmegaSetPositionControl();
+	AdjuctControlOutput = &OmegaATIThread::PositionControl;
+}
+
+void OmegaATIThread::setForceControl()
+{
+	_positionControl = false;
+	this->OmegaSetForceControl();
+	AdjuctControlOutput = &OmegaATIThread::ForceControl;
+}
 
 void OmegaATIThread::setFreeMotionControl(bool on)
 {
@@ -26,6 +39,7 @@ void OmegaATIThread::setFreeMotionControl(bool on)
 	{
 		if(_positionControl)
 		{
+
 			drdRegulatePos(false);
 		}
 		else
@@ -74,6 +88,7 @@ void OmegaATIThread::PositionControl()
 	// Get controller offset
 	double zPos = _zpController.update(ftFz);
 
+	//printf("% 3.3f\t", zPos);
 	// Set the tracking position setpoint
 	drdTrackPos(x, y, z + zPos);
 
@@ -167,7 +182,10 @@ bool OmegaATIThread::threadInit()
 
 
 	// PID PositionController
-	_zpController.InitController(_pidPosCtrl_filterOn);
+	_pidPosCtrl_filterOff.outMax = _omegaData.getZLimitMax();
+	_pidPosCtrl_filterOff.outMin = _omegaData.getZLimitMin();
+	_zpController.InitController(_pidPosCtrl_filterOff);
+	_zpController.setSetpoint(_ftZForce);
 
 	// PID Omega Froce controller, maintains position
 	_xForceController.InitController(_pidParams_omegaForceCtrl);
@@ -259,6 +277,11 @@ bool OmegaATIThread::OmegaSetForceControl()
 	drdRegulateRot(false);
 	drdEnableFilter(false);
 
+	double f[8];
+	memset(f, 0, sizeof(f));
+	f[2] = -0.5;
+	drdSetForceAndTorqueAndGripperForce(f);
+
 	return true;
 
 }
@@ -267,8 +290,13 @@ bool OmegaATIThread::OmegaSetPositionControl()
 {
 
 
+
+
+	_omegaData.updateData();
 	double px, py, pz;
-	dhdGetPosition(&px, &py, &pz);
+	_omegaData.getAxesPos(&px, &py, &pz);
+
+	drdRegulatePos(true);
 
 	drdEnableFilter(true);
 	if (drdMoveToPos (px, py, pz) < 0) 
@@ -278,8 +306,11 @@ bool OmegaATIThread::OmegaSetPositionControl()
 		return false;
 	}
 
+	while(drdIsMoving())
+		__nop();
 
 	drdEnableFilter(false);
+
 
 	return true;
 }
@@ -352,8 +383,9 @@ void OmegaATIThread::Configure()
 
 		_pidPosCtrl_filterOff.Kp = PIDPosCtrl_FilterOff.check("Z_KP", Value(0)).asDouble();
 		_pidPosCtrl_filterOff.Ki = PIDPosCtrl_FilterOff.check("Z_KI", Value(0)).asDouble();
+		_pidPosCtrl_filterOff.Ki /= 100000.0; //Hack
 		_pidPosCtrl_filterOff.Kd = PIDPosCtrl_FilterOff.check("Z_KD", Value(0)).asDouble();
-		printf("Filter-on: % 1.3e, % 1.3e, % 1.3e\n", _pidPosCtrl_filterOff.Kp, _pidPosCtrl_filterOff.Ki, _pidPosCtrl_filterOff.Kd);
+		printf("Filter-off: % 1.3e, % 1.3e, % 1.3e\n", _pidPosCtrl_filterOff.Kp, _pidPosCtrl_filterOff.Ki, _pidPosCtrl_filterOff.Kd);
 	}
 
 	Bottle &PIDPosCtrl_FilterOn = _rsf.findGroup("PIDPosCtrl_FilterOn");
@@ -362,8 +394,9 @@ void OmegaATIThread::Configure()
 
 		_pidPosCtrl_filterOn.Kp = PIDPosCtrl_FilterOn.check("Z_KP", Value(0)).asDouble();
 		_pidPosCtrl_filterOn.Ki = PIDPosCtrl_FilterOn.check("Z_KI", Value(0)).asDouble();
+		_pidPosCtrl_filterOn.Ki /= 100000.0; //Hack
 		_pidPosCtrl_filterOn.Kd = PIDPosCtrl_FilterOn.check("Z_KD", Value(0)).asDouble();
-		printf("Filter-off % 1.3e, % 1.3e, % 1.3e\n", _pidPosCtrl_filterOn.Kp, _pidPosCtrl_filterOn.Ki, _pidPosCtrl_filterOn.Kd);
+		printf("Filter-on % 1.3e, % 1.3e, % 1.3e\n", _pidPosCtrl_filterOn.Kp, _pidPosCtrl_filterOn.Ki, _pidPosCtrl_filterOn.Kd);
 	}
 
 	Bottle &PIDOmegaForceCtrl = _rsf.findGroup("PIDOmegaForceCtrl");

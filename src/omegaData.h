@@ -56,6 +56,14 @@ public:
 		_mutex.unlock();
 	}
 
+	double getZLimitMax()
+	{
+		return _zLimitMax;
+	}
+	double getZLimitMin()
+	{
+		return _zLimitMin;
+	}
 	void setAxesLimitMin(double x, double y, double z)
 	{
 		_xLimitMin = x;

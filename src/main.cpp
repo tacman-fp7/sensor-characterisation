@@ -42,12 +42,27 @@ int main(int argc, char *argv[]) {
 			char key = dhdKbGet ();
 			if(key == 'q' || key == 'Q') // quit the experiment
 				break;
-			else if(key == 'f' || key == 'F') // update the position of the Omega device.
+			else if(key == 'r' || key == 'R') // update the position of the Omega device.
 			{
 				// Allow free movement of the omega device
 				freeCtrl = !freeCtrl;
 				experimentThread.setFreeMotionControl(freeCtrl);
-
+			}
+			else if(key == 'p' || key == 'P') // update the position of the Omega device.
+			{
+				if(freeCtrl){
+					freeCtrl = false;
+					experimentThread.setFreeMotionControl(freeCtrl);
+				}
+				experimentThread.setPositionControl();
+			}
+			else if(key == 'f' || key == 'f') // update the position of the Omega device.
+			{
+				if(freeCtrl){
+					freeCtrl = false;
+					experimentThread.setFreeMotionControl(freeCtrl);
+				}
+				experimentThread.setForceControl();
 			}
 			else if( key == 'U')
 			{
@@ -64,41 +79,10 @@ int main(int argc, char *argv[]) {
 
 		}
 	}
+
+	// Stop the contorller
 	experimentThread.stop();
 
 	return 0;
 }
 
-/*
-
-posCtrl = !posCtrl;
-				if(posCtrl)
-				{
-
-					experimentThread.UpdateOmegaPosition();
-					dhdSleep(1);
-					experimentThread.resume();
-#ifdef USE_POSITION_CONTROLLER					
-					drdStart();
-#endif
-
-				}
-				else
-				{
-
-					experimentThread.suspend();
-					dhdSleep(0.1);
-
-					double f[8];
-					memset(f, 0, sizeof(f));
-					f[2] = -0.5;
-					drdSetForceAndTorqueAndGripperForce(f);
-
-#ifdef USE_POSITION_CONTROLLER
-					drdStop();
-					dhdSleep(1);
-					dhdEnableForce(DHD_ON);					
-#endif
-				}
-
-*/
