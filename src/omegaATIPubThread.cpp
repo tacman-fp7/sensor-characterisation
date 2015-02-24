@@ -31,7 +31,7 @@ bool OmegaATIPubThread::threadInit()
 
 void OmegaATIPubThread::threadRelease()
 {
-
+	_sem_publishData.~Semaphore();
 }
 
 void OmegaATIPubThread::publishData()

@@ -19,8 +19,45 @@ using namespace std;
 using namespace yarp::os;
 
 
-#define FT_Z 2
 
+void OmegaATIThread::setFreeMotionControl(bool on)
+{
+	if(on)
+	{
+		if(_positionControl)
+		{
+			drdRegulatePos(false);
+		}
+		else
+		{
+			double f[8];
+			memset(f, 0, sizeof(f));
+			f[2] = -0.5;
+			drdSetForceAndTorqueAndGripperForce(f);
+		}
+		// Set the controler to free motion control
+		AdjuctControlOutput = &OmegaATIThread::FreeMotionControl;
+	}
+	else
+	{
+		this->UpdateOmegaPosition();
+
+		if(_positionControl)
+		{
+			drdRegulatePos(true);
+			AdjuctControlOutput = &OmegaATIThread::PositionControl;
+		}
+		else
+		{
+			AdjuctControlOutput = &OmegaATIThread::ForceControl;
+		}
+	}
+}
+
+void OmegaATIThread::FreeMotionControl()
+{
+	// Do nothing
+}
 void OmegaATIThread::PositionControl()
 {
 
@@ -56,24 +93,17 @@ void OmegaATIThread::ForceControl()
 	double omegaFx, omegaFy, omegaFz;
 	dhdGetForce(&omegaFx, &omegaFy, &omegaFz);
 	//printf("Omega F: % 3.4f, % 3.4f, % 3.4f\n", omegaFx, omegaFy, omegaFz);
-	
+
 	// Read omega position data
 	double ox, oy, oz;
 	dhdGetPosition(&ox, &oy, &oz);
 	//printf("Omega P: % 3.4f, % 3.4f, % 3.4f\n", ox, oy, oz);
 
-	
-	
+
+
 	double velPos[DHD_MAX_DOF];
 	drdGetVelocity(velPos);
 
-	//double fx = _xForceController.update(ox, velPos[0]);
-	//double fy = _yForceController.update(oy, velPos[1]);
-	//double fz = _zForceController.update(oz, velPos[2]);
-	
-	//double fz = _zOmegaFTController.getSetpoint() + _zOmegaFTController.update(ftFz);
-	//double fz = _zOmegaFTController.update(oz, velPos[3], ftFz);
-	
 	double fx = _xController->update(ox, velPos[0], ftFx);
 	double fy = _yController->update(oy, velPos[1], ftFy);
 	double fz = _zController->update(oz, velPos[2], ftFz);
@@ -94,7 +124,7 @@ void OmegaATIThread::run()
 	//printf("Time: % 3.0f\n",  (std::clock() - _time) / (double)(CLOCKS_PER_SEC / 1000));
 	//_time = std::clock();
 
-	
+
 	_forceTorqueData.updateData();
 	if(_ftNotBiased)
 	{
@@ -103,16 +133,9 @@ void OmegaATIThread::run()
 	}
 	_omegaATIPubThread->publishData();
 
-#ifdef USE_POSITION_CONTROLLER
-	this->PositionControl();
-#endif
-
-#ifdef USE_FORCE_CONTROLLER
-	this->ForceControl();
-#endif
-
-
-
+	// The control step can be defined at runtime by user. 
+	// The system starts with force controller.
+	(this->*AdjuctControlOutput)();
 
 }
 
@@ -121,100 +144,73 @@ bool OmegaATIThread::threadInit()
 
 	bool ret = true;
 	_ftNotBiased = true;
-	_stepSize = 0.0002;
+	_stepSize = 0.0002; //TODO: move to the config file
+
+	// ReadConfiguration file
+	this->Configure();
 
 
+	// Initialise omega device
+	ret = this->InitOmegaCommon();
 
-	// Initialise the omega device
-#ifdef USE_POSITION_CONTROLLER
-	ret = init_omega_drd();
-#endif
+	// We start in force control mode, which is smoother
+	AdjuctControlOutput = &OmegaATIThread::ForceControl;
 
-#ifdef USE_FORCE_CONTROLLER
-	ret = init_omega_dhd();
-#endif
+	ret = this->OmegaSetForceControl();
 
+	// Set the current position of the device as the desired position
+	this->UpdateOmegaPosition();
 
+	// Start the publishing thread
 	_omegaATIPubThread = new OmegaATIPubThread(1, &_forceTorqueData, &_omegaData);
 	_omegaATIPubThread->start();
 
 
-	// PID 
-	_zpController.setKp(OMEGA_Z_KP);
-	_zpController.setKi(OMEGA_Z_KI);
-	_zpController.setKd(OMEGA_Z_KD);
-	_zpController.setOutMax(OMEGA_Z_MAX);
-	_zpController.setOutMin(OMEGA_Z_MIN);
-	_zpController.setSetpoint(OMEGA_Z_SETPOINT);
+	// PID PositionController
+	_zpController.InitController(_pidPosCtrl_filterOn);
 
-	
-	_xForceController.setKp(FORCE_KP);
-	_xForceController.setKd(FORCE_KD);
-	_xForceController.setKi(FORCE_KI);
-	_xForceController.setOutMax(OMEGA_FORCE_MAX);
-	_xForceController.setOutMin(-OMEGA_FORCE_MAX);
-	_xForceController.setSetpoint(0);
+	// PID Omega Froce controller, maintains position
+	_xForceController.InitController(_pidParams_omegaForceCtrl);
+	_yForceController.InitController(_pidParams_omegaForceCtrl);
+	_zForceController.InitController(_pidParams_omegaForceCtrl);
 
-	_yForceController.setKp(FORCE_KP);
-	_yForceController.setKd(FORCE_KD);
-	_yForceController.setKi(FORCE_KI);
-	_yForceController.setOutMax(OMEGA_FORCE_MAX);
-	_yForceController.setOutMin(-OMEGA_FORCE_MAX);
-	_yForceController.setSetpoint(0);
-
-	_zForceController.setKp(FORCE_KP);
-	_zForceController.setKd(FORCE_KD);
-	_zForceController.setKi(FORCE_KI);
-	_zForceController.setOutMax(OMEGA_FORCE_MAX);
-	_zForceController.setOutMin(-OMEGA_FORCE_MAX);
-	_zForceController.setSetpoint(0);
-
-
-	_zOmegaFTController.setKp(FT_FORCE_KP);
-	_zOmegaFTController.setKd(FT_FORCE_KD);
-	_zOmegaFTController.setKi(FT_FORCE_KI);
-	_zOmegaFTController.setOutMax(FT_FORCE_MAX);
-	_zOmegaFTController.setOutMin(-FT_FORCE_MAX);
-	_zOmegaFTController.setSetpoint(FT_SETPOINT);
+	// PID Uses Force/Torque to change forces
+	_zOmegaFTController.InitController(_pidParams_FTForceCtrl);
+	_zOmegaFTController.setSetpoint(_ftZForce);
 
 	// Tentatitive, to be changed during runtime
 	_xController = &_xForceController;  // Force controller
 	_yController = &_yForceController;  // Force controller
 	_zController = &_zOmegaFTController; //Hybrid controller
 
-	
-	this->UpdateOmegaPosition();
-
 	cout < "\nOmega initialised\n";
 	return ret;
 }
+
+
 
 void OmegaATIThread::threadRelease()
 {
 
 
 	// Close the Omega haptic device
-#ifdef USE_POSITION_CONTROLLER
+
+
+	dhdEnableForce(DHD_OFF);
+	dhdSleep(0.1); // Wait for a short while before closing the system
+
 	drdStop();
 	drdClose();
-#endif // USE_POSITION_CONTROLLER
 
-#ifdef USE_FORCE_CONTROLLER
-	dhdEnableForce(DHD_OFF);
-	dhdSleep(1);
-	dhdStop();
-	dhdClose();
-#endif // USE_FORCE_CONTROLLER
+
 
 	_omegaATIPubThread->stop();
-	_omegaATIPubThread->threadRelease();
 	delete _omegaATIPubThread;
 }
 
-
-bool init_omega()
+bool OmegaATIThread::InitOmegaCommon()
 {
-		// Configuration of the Omega device
+	// Configuration of the Omega device
 	dhdEnableExpertMode ();
 
 	// open the first available device
@@ -248,30 +244,33 @@ bool init_omega()
 	drdSetEncPGain(8); //TDODO: config file parameter
 	drdSetEncIGain(16);
 
+	drdEnableFilter(true);
+	//Initial position
+	drdMoveToPos(-.02, 0, 0); // Safe position above the finger
+	drdEnableFilter(false);
+
 }
 
-bool init_omega_dhd()
+bool OmegaATIThread::OmegaSetForceControl()
 {
-
-	init_omega();
 
 	drdRegulatePos(false);
 	drdRegulateGrip(false);
 	drdRegulateRot(false);
 	drdEnableFilter(false);
-	
+
 	return true;
-	
+
 }
 
-// Initialise the omega device
-bool init_omega_drd()
+bool OmegaATIThread::OmegaSetPositionControl()
 {
-	init_omega();
+
 
 	double px, py, pz;
 	dhdGetPosition(&px, &py, &pz);
-	
+
+	drdEnableFilter(true);
 	if (drdMoveToPos (px, py, pz) < 0) 
 	{
 		printf ("error: failed to move to central position (%s)\n", dhdErrorGetLastStr ());
@@ -288,7 +287,6 @@ bool init_omega_drd()
 void OmegaATIThread::UpdateOmegaPosition()
 {
 	_omegaData.updateData();
-
 	double px, py, pz;
 	_omegaData.getAxesPos(&px, &py, &pz);
 	_xForceController.setSetpoint(px);
@@ -319,4 +317,77 @@ void OmegaATIThread::updateBias()
 void OmegaATIThread::stepDownTest()
 {
 	_omegaData.setZ(_omegaData.getZ() - (_stepSize * 10));
+}
+
+void OmegaATIThread::Configure()
+{
+	// Configure the thread
+	cout << "Reading configuration file" << endl;
+
+	Bottle &OmegaConfig = _rsf.findGroup("OmegaConf");
+	if(!OmegaConfig.isNull())
+	{
+		_ftZForce = OmegaConfig.check("DefaultZForce", Value(-0.5)).asDouble();
+		Bottle *omegaMinList = OmegaConfig.find("PosLimMin").asList();
+		Bottle *omegaMaxList = OmegaConfig.find("PosLimMax").asList();
+
+		if(!(omegaMinList->isNull() || omegaMaxList->isNull()))
+		{
+			_omegaData.setAxesLimitMin(omegaMinList->get(0).asDouble(),
+				omegaMinList->get(1).asDouble(),
+				omegaMinList->get(2).asDouble());
+
+			_omegaData.setAxesLimitMax(omegaMaxList->get(0).asDouble(),
+				omegaMaxList->get(1).asDouble(),
+				omegaMaxList->get(2).asDouble());
+
+			printf("Omega Max: %s\n", omegaMaxList->toString());
+			printf("Omega Min: %s\n", omegaMinList->toString());
+		}
+	}
+
+	Bottle &PIDPosCtrl_FilterOff = _rsf.findGroup("PIDPosCtrl_FilterOff");
+	if(!PIDPosCtrl_FilterOff.isNull())
+	{
+
+		_pidPosCtrl_filterOff.Kp = PIDPosCtrl_FilterOff.check("Z_KP", Value(0)).asDouble();
+		_pidPosCtrl_filterOff.Ki = PIDPosCtrl_FilterOff.check("Z_KI", Value(0)).asDouble();
+		_pidPosCtrl_filterOff.Kd = PIDPosCtrl_FilterOff.check("Z_KD", Value(0)).asDouble();
+		printf("Filter-on: % 1.3e, % 1.3e, % 1.3e\n", _pidPosCtrl_filterOff.Kp, _pidPosCtrl_filterOff.Ki, _pidPosCtrl_filterOff.Kd);
+	}
+
+	Bottle &PIDPosCtrl_FilterOn = _rsf.findGroup("PIDPosCtrl_FilterOn");
+	if(!PIDPosCtrl_FilterOn.isNull())
+	{
+
+		_pidPosCtrl_filterOn.Kp = PIDPosCtrl_FilterOn.check("Z_KP", Value(0)).asDouble();
+		_pidPosCtrl_filterOn.Ki = PIDPosCtrl_FilterOn.check("Z_KI", Value(0)).asDouble();
+		_pidPosCtrl_filterOn.Kd = PIDPosCtrl_FilterOn.check("Z_KD", Value(0)).asDouble();
+		printf("Filter-off % 1.3e, % 1.3e, % 1.3e\n", _pidPosCtrl_filterOn.Kp, _pidPosCtrl_filterOn.Ki, _pidPosCtrl_filterOn.Kd);
+	}
+
+	Bottle &PIDOmegaForceCtrl = _rsf.findGroup("PIDOmegaForceCtrl");
+	if(!PIDOmegaForceCtrl.isNull())
+	{
+		_pidParams_omegaForceCtrl.Kp = PIDOmegaForceCtrl.check("KP", Value(0)).asDouble();
+		_pidParams_omegaForceCtrl.Ki = PIDOmegaForceCtrl.check("KI", Value(0)).asDouble();
+		_pidParams_omegaForceCtrl.Kd = PIDOmegaForceCtrl.check("KD", Value(0)).asDouble();
+		_pidParams_omegaForceCtrl.outMax = PIDOmegaForceCtrl.check("MAX", Value(0)).asDouble();
+		_pidParams_omegaForceCtrl.outMin = -1 * _pidParams_omegaForceCtrl.outMax;
+		printf("Omega-force: % 4.2f, % 4.2f, % 4.2f, % 4.2f\n", _pidParams_omegaForceCtrl.Kp, _pidParams_omegaForceCtrl.Ki, _pidParams_omegaForceCtrl.Kd, _pidParams_omegaForceCtrl.outMax );
+	}
+
+
+	Bottle &PIDFTForceCtrl = _rsf.findGroup("PIDFTForceCtrl");
+	if(!PIDFTForceCtrl.isNull())
+	{
+		_pidParams_FTForceCtrl.Kp = PIDFTForceCtrl.check("KP", Value(0)).asDouble();
+		_pidParams_FTForceCtrl.Ki = PIDFTForceCtrl.check("KI", Value(0)).asDouble();
+		_pidParams_FTForceCtrl.Kd = PIDFTForceCtrl.check("KD", Value(0)).asDouble();
+		_pidParams_FTForceCtrl.outMax = PIDFTForceCtrl.check("MAX", Value(0)).asDouble();
+		_pidParams_FTForceCtrl.outMin = -1 * _pidParams_FTForceCtrl.outMax;
+		printf("Ft-force: % 4.2f, % 4.2f, % 4.2f, % 4.2f\n", _pidParams_FTForceCtrl.Kp, _pidParams_FTForceCtrl.Ki, _pidParams_FTForceCtrl.Kd, _pidParams_FTForceCtrl.outMax);
+	}
+
+
 }

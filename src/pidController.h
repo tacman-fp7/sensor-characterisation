@@ -2,6 +2,17 @@
 #include <cstddef>
 #include <time.h>
 
+typedef struct pidParameters pidParams_t;
+
+struct pidParameters
+{
+	double Kp;
+	double Ki;
+	double Kd;
+	double outMax;
+	double outMin;
+};
+
 class PidController
 {
 
@@ -15,6 +26,7 @@ public:
 	void setOutMin(double outMin);
 	void setSetpoint(double setpoint);
 	double getSetpoint();
+	void InitController(pidParams_t params);
 
 
 	double update(double curVal);

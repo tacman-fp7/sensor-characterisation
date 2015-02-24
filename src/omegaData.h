@@ -14,6 +14,12 @@ class OmegaData
 public:
 	OmegaData():_x(0), _y(0), _z(0), _xBias(0), _yBias(0), _zBias(0)
 	{
+		_xLimitMin = 0;
+		_yLimitMin = 0;
+		_zLimitMin = 0;
+		_xLimitMax = 0;
+		_yLimitMax = 0;
+		_zLimitMax = 0;
 		_timeStamp.update();
 		_port_omega.open("/OmegaATI/omegaPosition");
 	};
@@ -50,6 +56,18 @@ public:
 		_mutex.unlock();
 	}
 
+	void setAxesLimitMin(double x, double y, double z)
+	{
+		_xLimitMin = x;
+		_yLimitMin = y;
+		_zLimitMin = z;
+	}
+	void setAxesLimitMax(double x, double y, double z)
+	{
+		_xLimitMax = x;
+		_yLimitMax = y;
+		_zLimitMax = z;
+	}
 	void setAxesPos(double x, double y, double z)
 	{
 		_mutex.lock();
@@ -92,9 +110,9 @@ public:
 		_mutex.unlock();
 	}
 private:
-	double _x;
-	double _y;
-	double _z;
+	double _x, _xLimitMin, _xLimitMax;
+	double _y, _yLimitMin, _yLimitMax;;
+	double _z, _zLimitMin, _zLimitMax;;
 	double _xBias, _yBias, _zBias;
 	BufferedPort<Bottle> _port_omega;
 	yarp::os::Mutex _mutex;

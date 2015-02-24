@@ -14,6 +14,14 @@ PidController::PidController()
 	_integral = 0;
 }
 
+void PidController::InitController(pidParams_t params)
+{
+	_Kp = params.Kp;
+	_Ki = params.Ki;
+	_Kd = params.Kd;
+	_outMax = params.outMax;
+	_outMin = params.outMin;
+}
 void PidController::setKp(double Kp)
 {
 	_Kp = Kp;
