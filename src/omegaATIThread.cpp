@@ -15,6 +15,7 @@
 #include <vector>
 #include "pidController.h"
 #include <ctime>
+#include "pidPositionController.h"
 using namespace std;
 using namespace yarp::os;
 
@@ -86,14 +87,18 @@ void OmegaATIThread::PositionControl()
 	_omegaData.getAxesPos(&x, &y, &z);
 
 	// Get controller offset
-	double zPos = _zpController.update(ftFz);
+	
+	double xPos = _xControllerPos->update(ftFx);//_xPositionController.update(ftFx);
+	double yPos = _yControllerPos->update(ftFy); //_yPositionController.update(ftFy);
+	double zPos = _zControllerPos->update(ftFz);//_zPositionController.update(ftFz);
 
-	//printf("% 3.3f\t", zPos);
+	//printf("% 3.3f\t", xPos);
 	// Set the tracking position setpoint
-	drdTrackPos(x, y, z + zPos);
+	drdTrackPos(x + xPos, y + yPos, z + zPos);
 
 	// Update omega position
-	_omegaData.setZ(z + zPos);
+	//_omegaData.setZ(z + zPos);
+	_omegaData.setAxesPos(x + xPos, y + yPos, z + zPos);
 
 }
 
@@ -184,8 +189,13 @@ bool OmegaATIThread::threadInit()
 	// PID PositionController
 	_pidPosCtrl_filterOff.outMax = _omegaData.getZLimitMax();
 	_pidPosCtrl_filterOff.outMin = _omegaData.getZLimitMin();
-	_zpController.InitController(_pidPosCtrl_filterOff);
-	_zpController.setSetpoint(_ftZForce);
+
+	_zPositionController.InitController(_pidPosCtrl_filterOff);
+	_zPositionController.setSetpoint(_ftZForce);
+	_xPositionController.InitController(_pidPosCtrl_filterOff);
+	_xPositionController.setSetpoint(0); //TODO: check
+	_yPositionController.InitController(_pidPosCtrl_filterOff);
+	_yPositionController.setSetpoint(0); //TODO: check
 
 	// PID Omega Froce controller, maintains position
 	_xForceController.InitController(_pidParams_omegaForceCtrl);
@@ -204,6 +214,11 @@ bool OmegaATIThread::threadInit()
 	_xController = &_xForceController;  // Force controller
 	_yController = &_yForceController;  // Force controller
 	_zController = &_zOmegaFTController; //Hybrid controller
+
+	// Urgh
+	_xControllerPos = &_xZeroPositionController;
+	_yControllerPos = &_yZeroPositionController;
+	_zControllerPos = &_zPositionController;
 
 	cout < "\nOmega initialised\n";
 	return ret;
@@ -294,27 +309,27 @@ bool OmegaATIThread::OmegaSetPositionControl()
 {
 
 
-
+	//printf("position control requested\n");
 
 	_omegaData.updateData();
 	double px, py, pz;
 	_omegaData.getAxesPos(&px, &py, &pz);
-
+	//printf("position1\n");
 	drdRegulatePos(true);
-
+	//printf("position2\n");
 	drdEnableFilter(true);
-	if (drdMoveToPos (px, py, pz) < 0) 
+	if (drdMoveToPos (px, py, pz, false) < 0) 
 	{
 		printf ("error: failed to move to central position (%s)\n", dhdErrorGetLastStr ());
 		dhdSleep (2.0);
 		return false;
 	}
-
-	while(drdIsMoving())
-		__nop();
-
+	//printf("position3\n");
+	dhdSleep(1);
+	//printf("position4\n");
 	drdEnableFilter(false);
 
+	//printf("position enabled\n");
 
 	return true;
 }
@@ -327,6 +342,7 @@ void OmegaATIThread::UpdateOmegaPosition()
 	_xForceController.setSetpoint(px);
 	_yForceController.setSetpoint(py);
 	_zForceController.setSetpoint(pz);
+
 
 }
 
@@ -390,7 +406,7 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 
 	// Experiment is done, reduce force TODO: rename variable for defaultFzFroce
 	_zOmegaFTController.setSetpoint(_ftZForce);
-	_zpController.setSetpoint(_ftZForce); 
+	_zPositionController.setSetpoint(_ftZForce); 
 }
 
 void OmegaATIThread::performExperimentConsecStep()
@@ -400,7 +416,7 @@ void OmegaATIThread::performExperimentConsecStep()
 
 	if(_experimentData.controlStrategy == 1) // 1 is for forceController
 	{
-		if(_experimentData.forceAxis == 0)
+		if(_experimentData.forceAxis != 2)
 		{
 			// In this case I have to change the PID controller
 			_xOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(0));
@@ -409,15 +425,21 @@ void OmegaATIThread::performExperimentConsecStep()
 			_yController = &_yOmegaFTController;
 			
 		}
-		if(_experimentData.forceAxis == 2)
-			_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
+		_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
 	
 		setForceControl();
 	}
-	else if(_experimentData.controlStrategy == 2)
+	else if(_experimentData.controlStrategy == 2) // 2 is for positon controller
 	{
-		if(_experimentData.forceAxis == 2)
-			_zpController.setSetpoint(_experimentData.forceSetpoint.at(2));
+		
+		if(_experimentData.forceAxis != 2)
+		{
+			_xPositionController.setSetpoint(_experimentData.forceSetpoint.at(0));
+			_yPositionController.setSetpoint(_experimentData.forceSetpoint.at(1));
+			//_xControllerPos = &_xPositionController;
+			//_yControllerPos = &_yPositionController;
+		}
+		_zPositionController.setSetpoint(_experimentData.forceSetpoint.at(2));
 		
 		setPositionControl();
 	}
@@ -459,7 +481,7 @@ void OmegaATIThread::performExperimentStep()
 	else if(_experimentData.controlStrategy == 2)
 	{
 		if(_experimentData.forceAxis == 2)
-			_zpController.setSetpoint(_experimentData.forceSetpoint.at(2));
+			_zPositionController.setSetpoint(_experimentData.forceSetpoint.at(2));
 		
 		setPositionControl();
 	}

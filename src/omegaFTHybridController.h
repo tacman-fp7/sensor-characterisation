@@ -5,7 +5,7 @@ class OmegaFTHybridController: public PidController
 {
 	virtual double update(double omegaPosition, double omegaVelocity, double ftValue)
 	{
-		return (_setpoint + PidController::update(ftValue));
+		return (_setpoint + PidController::pidUpdate(ftValue));
 	};
 };
 

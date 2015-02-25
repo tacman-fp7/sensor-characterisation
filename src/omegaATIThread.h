@@ -17,6 +17,7 @@
 #include "omegaData.h"
 #include "omegaFTHybridController.h"
 #include "omegaForceController.h"
+#include "pidPositionController.h"
 
 #include <yarp/os/ResourceFinder.h>
 #include <yarp/dev/all.h>
@@ -88,8 +89,19 @@ private:
 	ResourceFinder& _rsf;
 
 	ForceTorqueData _forceTorqueData;
-	PidController _zpController;
 
+	// Decide during runtime which subcontroller to choose
+	PidController* _xControllerPos;
+	PidController* _yControllerPos;
+	PidController* _zControllerPos;
+
+	OmegaPositionController _zPositionController;
+	OmegaPositionController _xPositionController;
+	OmegaPositionController _yPositionController;
+
+	PidController _zZeroPositionController;
+	PidController _xZeroPositionController;
+	PidController _yZeroPositionController;
 
 	OmegaForceController _xForceController;
 	OmegaForceController _yForceController;

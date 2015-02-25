@@ -29,8 +29,10 @@ public:
 	void InitController(pidParams_t params);
 
 
-	double update(double curVal);
+	virtual double update(double curval){return 0;}
+	
 	double update(double curVal, double velocity);
+	double pidUpdate(double curVal);
 
 private:
 	inline double P(double error);
@@ -39,6 +41,7 @@ private:
 
 protected:
 	double _setpoint;
+	
 
 private:
 	double _Kp;
