@@ -33,9 +33,10 @@ struct experimentDetails
 	int controlStrategy;
     vector<double> forceSetpoint;
 	vector<double> sampleLocation;
-	double contactPeriod;
+	double contactPeriod; // rename to contactDuration
 	double hysteresisDelay;
 	int forceAxis;
+	int isConsecutiveForce;
 };
 
 class OmegaATIThread: public RateThread
@@ -79,6 +80,7 @@ private:
 	bool OmegaSetPositionControl();
 	void ReadExperimentDetails(Bottle& bottle);
 	void performExperimentStep();
+	void performExperimentConsecStep();
 
 private:
 	bool _positionControl;
@@ -93,7 +95,8 @@ private:
 	OmegaForceController _yForceController;
 	OmegaForceController _zForceController;
 
-
+	OmegaFTHybridController _xOmegaFTController;
+	OmegaFTHybridController _yOmegaFTController;
 	OmegaFTHybridController _zOmegaFTController;
 
 	// Decide during runtime which subcontroller to choose
@@ -112,6 +115,8 @@ private:
 	pidParams_t _pidPosCtrl_filterOff;
 	pidParams_t _pidParams_omegaForceCtrl;
 	pidParams_t _pidParams_FTForceCtrl;
+	pidParams_t _pidParams_FTForceCtrl_x;
+	pidParams_t _pidParams_FTForceCtrl_y;
 
 	experiment_t _experimentData;
 };

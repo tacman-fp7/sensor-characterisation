@@ -8,3 +8,4 @@ class OmegaFTHybridController: public PidController
 		return (_setpoint + PidController::update(ftValue));
 	};
 };
+

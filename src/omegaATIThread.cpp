@@ -195,7 +195,11 @@ bool OmegaATIThread::threadInit()
 	// PID Uses Force/Torque to change forces
 	_zOmegaFTController.InitController(_pidParams_FTForceCtrl);
 	_zOmegaFTController.setSetpoint(_ftZForce);
-
+	_xOmegaFTController.InitController(_pidParams_FTForceCtrl_x);
+	_xOmegaFTController.setSetpoint(0);
+	_yOmegaFTController.InitController(_pidParams_FTForceCtrl_y);
+	_yOmegaFTController.setSetpoint(0);
+	
 	// Tentatitive, to be changed during runtime
 	_xController = &_xForceController;  // Force controller
 	_yController = &_yForceController;  // Force controller
@@ -372,7 +376,15 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 		
 		// Run the step
 		printf("Running the step...");
-		performExperimentStep();
+		if(_experimentData.isConsecutiveForce)
+		{
+			printf("\nconsecutive\n");
+			performExperimentConsecStep();
+		}
+		else
+		{
+			performExperimentStep();
+		}
 		printf("Done.\n\n");
 	}
 
@@ -381,8 +393,42 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 	_zpController.setSetpoint(_ftZForce); 
 }
 
+void OmegaATIThread::performExperimentConsecStep()
+{
+	// I assume the position is same as the current position
+	UpdateOmegaPosition(); //update the position of the omega device in memory
+
+	if(_experimentData.controlStrategy == 1) // 1 is for forceController
+	{
+		if(_experimentData.forceAxis == 0)
+		{
+			// In this case I have to change the PID controller
+			_xOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(0));
+			_yOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(1));
+			_xController = &_xOmegaFTController;
+			_yController = &_yOmegaFTController;
+			
+		}
+		if(_experimentData.forceAxis == 2)
+			_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
+	
+		setForceControl();
+	}
+	else if(_experimentData.controlStrategy == 2)
+	{
+		if(_experimentData.forceAxis == 2)
+			_zpController.setSetpoint(_experimentData.forceSetpoint.at(2));
+		
+		setPositionControl();
+	}
+
+	dhdSleep(_experimentData.contactPeriod);
+}
+
 void OmegaATIThread::performExperimentStep()
 {
+
+	
 	//Change to free motion controller
 	setFreeMotionControl(true);
 	drdRegulatePos(true);
@@ -396,16 +442,24 @@ void OmegaATIThread::performExperimentStep()
 	drdEnableFilter(false);
 	UpdateOmegaPosition(); //update the position of the omega device in memory
 	
+	// Change the x, y force controller to omega force to make sure if there was a
+	// consecutive force sequce applied, we undo its effects
+
+	_xController = &_xForceController;
+	_yController = &_yForceController;
+
 	// At the moment I am only considering z-axis force
 	if(_experimentData.controlStrategy == 1) // 1 is for forceController
 	{
-		_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
+		if(_experimentData.forceAxis == 2)
+			_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
 	
 		setForceControl();
 	}
 	else if(_experimentData.controlStrategy == 2)
 	{
-		_zpController.setSetpoint(_experimentData.forceSetpoint.at(2));
+		if(_experimentData.forceAxis == 2)
+			_zpController.setSetpoint(_experimentData.forceSetpoint.at(2));
 		
 		setPositionControl();
 	}
@@ -422,6 +476,7 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 	_experimentData.contactPeriod = bottle.check("contactPeriod", Value(0.0)).asDouble();
 	_experimentData.hysteresisDelay = bottle.check("hysteresisDelay", Value(0.0)).asDouble();
 	_experimentData.forceAxis = bottle.check("forceAxis", Value(-1)).asInt();
+	_experimentData.isConsecutiveForce = bottle.check("isConsecutiveForce", Value(0)).asInt();
 	Bottle* forceList = bottle.find("forceSetpoint").asList();
 	Bottle* sampleLocationList = bottle.find("sampleLocation").asList();
 	
@@ -453,6 +508,7 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 		_experimentData.sampleLocation.at(1), _experimentData.sampleLocation.at(2) );
 	printf("Contact period: % 3.3f\n", _experimentData.contactPeriod);
 	printf("Hysteresis delay: % 3.3f\n", _experimentData.hysteresisDelay);
+	printf("IsConsecutive: %d\n", _experimentData.isConsecutiveForce);
 	printf("Force axis: %d \n\n", _experimentData.forceAxis);
 
  
@@ -530,5 +586,25 @@ void OmegaATIThread::Configure()
 		printf("Ft-force: % 4.2f, % 4.2f, % 4.2f, % 4.2f\n", _pidParams_FTForceCtrl.Kp, _pidParams_FTForceCtrl.Ki, _pidParams_FTForceCtrl.Kd, _pidParams_FTForceCtrl.outMax);
 	}
 
+	Bottle &PIDFTForceCtrl_x = _rsf.findGroup("PIDFTForceCtrl_x");
+	if(!PIDFTForceCtrl.isNull())
+	{
+		_pidParams_FTForceCtrl_x.Kp = PIDFTForceCtrl_x.check("KP", Value(0)).asDouble();
+		_pidParams_FTForceCtrl_x.Ki = PIDFTForceCtrl_x.check("KI", Value(0)).asDouble();
+		_pidParams_FTForceCtrl_x.Kd = PIDFTForceCtrl_x.check("KD", Value(0)).asDouble();
+		_pidParams_FTForceCtrl_x.outMax = PIDFTForceCtrl_x.check("MAX", Value(0)).asDouble();
+		_pidParams_FTForceCtrl_x.outMin = -1 * _pidParams_FTForceCtrl.outMax;
+		printf("Ft-force-x: % 4.2f, % 4.2f, % 4.2f, % 4.2f\n", _pidParams_FTForceCtrl_x.Kp, _pidParams_FTForceCtrl_x.Ki, _pidParams_FTForceCtrl_x.Kd, _pidParams_FTForceCtrl_x.outMax);
+	}
 
+	Bottle &PIDFTForceCtrl_y = _rsf.findGroup("PIDFTForceCtrl_y");
+	if(!PIDFTForceCtrl.isNull())
+	{
+		_pidParams_FTForceCtrl_y.Kp = PIDFTForceCtrl_y.check("KP", Value(0)).asDouble();
+		_pidParams_FTForceCtrl_y.Ki = PIDFTForceCtrl_y.check("KI", Value(0)).asDouble();
+		_pidParams_FTForceCtrl_y.Kd = PIDFTForceCtrl_y.check("KD", Value(0)).asDouble();
+		_pidParams_FTForceCtrl_y.outMax = PIDFTForceCtrl_y.check("MAX", Value(0)).asDouble();
+		_pidParams_FTForceCtrl_y.outMin = -1 * _pidParams_FTForceCtrl.outMax;
+		printf("Ft-force-y: % 4.2f, % 4.2f, % 4.2f, % 4.2f\n", _pidParams_FTForceCtrl_y.Kp, _pidParams_FTForceCtrl_y.Ki, _pidParams_FTForceCtrl_y.Kd, _pidParams_FTForceCtrl_y.outMax);
+	}
 }

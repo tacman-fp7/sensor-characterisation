@@ -13,6 +13,7 @@
 using namespace std;
 using namespace yarp::os;
 
+
 int main(int argc, char *argv[]) {
 
 	Network yarp;
@@ -24,6 +25,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	
+
 	ResourceFinder rsf;
 	rsf.setVerbose();
 	rsf.setDefaultConfigFile("omegaATIConf.ini");
