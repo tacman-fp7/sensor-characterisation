@@ -20,13 +20,23 @@
 
 #include <yarp/os/ResourceFinder.h>
 #include <yarp/dev/all.h>
-
+#include <vector>
 
 
 using namespace yarp::os;
 using namespace std;
 
+typedef struct experimentDetails experiment_t;
 
+struct experimentDetails
+{
+	int controlStrategy;
+    vector<double> forceSetpoint;
+	vector<double> sampleLocation;
+	double contactPeriod;
+	double hysteresisDelay;
+	int forceAxis;
+};
 
 class OmegaATIThread: public RateThread
 {
@@ -56,6 +66,7 @@ public:
 	void setPositionControl();
 	void setForceControl();
 	void setFreeMotionControl(bool flag);
+	void runExperiment(ResourceFinder& rf);
 
 private:
 	void Configure();
@@ -66,6 +77,8 @@ private:
 	bool InitOmegaCommon();
 	bool OmegaSetForceControl();
 	bool OmegaSetPositionControl();
+	void ReadExperimentDetails(Bottle& bottle);
+	void performExperimentStep();
 
 private:
 	bool _positionControl;
@@ -99,5 +112,7 @@ private:
 	pidParams_t _pidPosCtrl_filterOff;
 	pidParams_t _pidParams_omegaForceCtrl;
 	pidParams_t _pidParams_FTForceCtrl;
+
+	experiment_t _experimentData;
 };
 

@@ -23,6 +23,7 @@ int main(int argc, char *argv[]) {
 		return false;
 	}
 
+	
 	ResourceFinder rsf;
 	rsf.setVerbose();
 	rsf.setDefaultConfigFile("omegaATIConf.ini");
@@ -64,9 +65,10 @@ int main(int argc, char *argv[]) {
 				}
 				experimentThread.setForceControl();
 			}
-			else if(key == 'E' || key == 'E') 
+			else if(key == 'e' || key == 'E') 
 			{
 				// Read the config file for experiment details
+				experimentThread.runExperiment(rsf);
 			}
 			else if( key == 'U')
 			{
@@ -84,7 +86,9 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	
 	// Stop the contorller
+	
 	experimentThread.stop();
 
 	return 0;

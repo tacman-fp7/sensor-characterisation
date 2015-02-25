@@ -350,6 +350,114 @@ void OmegaATIThread::stepDownTest()
 	_omegaData.setZ(_omegaData.getZ() - (_stepSize * 10));
 }
 
+void OmegaATIThread::runExperiment(ResourceFinder& rf)
+{
+
+	//ResourceFinder& expeRSF = rf.findNestedResourceFinder( "Experiment");
+
+	Bottle& experiments = rf.findGroup("Experiment");
+	if(experiments.isNull())
+	{
+		printf("No experiments in the file\n");
+		return;
+	}
+
+	int nExp = experiments.size();
+	printf("Experiment steps: %d\n", nExp);
+	
+	for(int i = 1; i < nExp; i++){
+		printf("%s\n", experiments.get(i).toString());
+		Bottle& step = rf.findGroup(experiments.get(i).asString());
+		ReadExperimentDetails(step); // updates the _experimentDetails
+		
+		// Run the step
+		printf("Running the step...");
+		performExperimentStep();
+		printf("Done.\n\n");
+	}
+
+	// Experiment is done, reduce force TODO: rename variable for defaultFzFroce
+	_zOmegaFTController.setSetpoint(_ftZForce);
+	_zpController.setSetpoint(_ftZForce); 
+}
+
+void OmegaATIThread::performExperimentStep()
+{
+	//Change to free motion controller
+	setFreeMotionControl(true);
+	drdRegulatePos(true);
+	drdEnableFilter(true);
+	// Move to 0 posisition to avoid any collisions
+	drdMoveToPos(0,0,0);
+	// Move to sample point
+	drdMoveToPos(_experimentData.sampleLocation.at(0),
+		_experimentData.sampleLocation.at(1),
+		_experimentData.sampleLocation.at(2));
+	drdEnableFilter(false);
+	UpdateOmegaPosition(); //update the position of the omega device in memory
+	
+	// At the moment I am only considering z-axis force
+	if(_experimentData.controlStrategy == 1) // 1 is for forceController
+	{
+		_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
+	
+		setForceControl();
+	}
+	else if(_experimentData.controlStrategy == 2)
+	{
+		_zpController.setSetpoint(_experimentData.forceSetpoint.at(2));
+		
+		setPositionControl();
+	}
+
+	dhdSleep(_experimentData.contactPeriod);
+	
+
+}
+
+
+void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
+{
+	_experimentData.controlStrategy = bottle.check("controlStrategy", Value(0)).asInt();
+	_experimentData.contactPeriod = bottle.check("contactPeriod", Value(0.0)).asDouble();
+	_experimentData.hysteresisDelay = bottle.check("hysteresisDelay", Value(0.0)).asDouble();
+	_experimentData.forceAxis = bottle.check("forceAxis", Value(-1)).asInt();
+	Bottle* forceList = bottle.find("forceSetpoint").asList();
+	Bottle* sampleLocationList = bottle.find("sampleLocation").asList();
+	
+	if((forceList->isNull() ||  sampleLocationList->isNull()))
+	{
+		printf("Warning: no force or sample location could be read. Skipping the step\n");
+		return;
+	}
+
+	if( (forceList->size() != 3) || (sampleLocationList->size() != 3))
+	{
+		printf("Warning: foce or sample location is not a tripple. Skipping the step\n");
+		return;
+	}
+
+	_experimentData.forceSetpoint.clear();
+	_experimentData.sampleLocation.clear();
+
+	for(int i = 0; i < 3; i++)
+	{
+		_experimentData.forceSetpoint.push_back(forceList->get(i).asDouble());
+		_experimentData.sampleLocation.push_back(sampleLocationList->get(i).asDouble());
+	}
+
+	printf("Control strategy: %d\n", _experimentData.controlStrategy);
+	printf("Foce setpoint: (% 3.3f, % 3.3f, % 3.3f)\n", _experimentData.forceSetpoint.at(0),
+		_experimentData.forceSetpoint.at(1), _experimentData.forceSetpoint.at(2));
+	printf("Sample location: (% 3.3f, % 3.3f, % 3.3f)\n", _experimentData.sampleLocation.at(0),
+		_experimentData.sampleLocation.at(1), _experimentData.sampleLocation.at(2) );
+	printf("Contact period: % 3.3f\n", _experimentData.contactPeriod);
+	printf("Hysteresis delay: % 3.3f\n", _experimentData.hysteresisDelay);
+	printf("Force axis: %d \n\n", _experimentData.forceAxis);
+
+ 
+}
+
 void OmegaATIThread::Configure()
 {
 	// Configure the thread
