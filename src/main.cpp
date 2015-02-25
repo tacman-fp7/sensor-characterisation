@@ -64,6 +64,10 @@ int main(int argc, char *argv[]) {
 				}
 				experimentThread.setForceControl();
 			}
+			else if(key == 'E' || key == 'E') 
+			{
+				// Read the config file for experiment details
+			}
 			else if( key == 'U')
 			{
 				experimentThread.stepUp();
