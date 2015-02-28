@@ -34,10 +34,13 @@ struct experimentDetails
 	int controlStrategy;
     vector<double> forceSetpoint;
 	vector<double> sampleLocation;
+	vector<double> sampleLocationEndpoint;
+	double stepSize;
 	double contactPeriod; // rename to contactDuration
 	double hysteresisDelay;
 	int forceAxis;
 	int isConsecutiveForce;
+	
 };
 
 class OmegaATIThread: public RateThread

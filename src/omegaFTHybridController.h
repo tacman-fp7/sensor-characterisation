@@ -13,7 +13,7 @@ public:
 
 	virtual void setRampSetpoint(double setpoint)
 	{
-		_setpoint = 0;
+		//_setpoint = 0;
 		_rampSetpoint = setpoint;
 	   _integral = 0;
 	}
