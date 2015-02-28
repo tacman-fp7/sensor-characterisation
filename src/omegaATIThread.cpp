@@ -90,7 +90,7 @@ void OmegaATIThread::PositionControl()
 	_omegaData.getAxesPos(&x, &y, &z);
 
 	// Get controller offset
-	
+
 	double xPos = _xControllerPos->update(ftFx);//_xPositionController.update(ftFx);
 	double yPos = _yControllerPos->update(ftFy); //_yPositionController.update(ftFy);
 	double zPos = _zControllerPos->update(ftFz);//_zPositionController.update(ftFz);
@@ -212,7 +212,7 @@ bool OmegaATIThread::threadInit()
 	_xOmegaFTController.setSetpoint(0);
 	_yOmegaFTController.InitController(_pidParams_FTForceCtrl_y);
 	_yOmegaFTController.setSetpoint(0);
-	
+
 	// Tentatitive, to be changed during runtime
 	_xController = &_xForceController;  // Force controller
 	_yController = &_yForceController;  // Force controller
@@ -388,12 +388,12 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 
 	int nExp = experiments.size();
 	printf("Experiment steps: %d\n", nExp);
-	
+
 	for(int i = 1; i < nExp; i++){
 		printf("%s\n", experiments.get(i).toString());
 		Bottle& step = rf.findGroup(experiments.get(i).asString());
 		ReadExperimentDetails(step); // updates the _experimentDetails
-		
+
 		// Run the step
 		printf("Running the step...");
 		if(_experimentData.isConsecutiveForce)
@@ -403,7 +403,44 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 		}
 		else
 		{
-			performExperimentStep();
+
+
+
+
+			// Should check step size
+			if(_experimentData.stepSize == 0)
+			{
+				performExperimentStep();
+			}
+			else
+			{
+
+				double vx = _experimentData.sampleLocationEndpoint.at(0) - _experimentData.sampleLocation.at(0);
+				double vy = _experimentData.sampleLocationEndpoint.at(1) - _experimentData.sampleLocation.at(1);	
+				double mag = sqrt(vx * vx + vy * vy);
+				// Unit vector
+				vx /= mag;
+				vy /= mag;
+
+				int nSteps = int(mag / (_experimentData.stepSize / 1000));
+
+				printf("Expected steps for mag (%f): %d \n", mag, nSteps);
+				// Go through steps
+
+
+				for (int step = 0; step < nSteps  ; step++)
+				{
+					printf("Step %02d\n", step); 
+
+					_experimentData.sampleLocation.at(0) += vx* step * _experimentData.stepSize / 1000;
+					_experimentData.sampleLocation.at(1) += vy* step * _experimentData.stepSize / 1000;
+
+					performExperimentStep();
+					dhdSleep(_experimentData.hysteresisDelay);
+
+
+				}
+			}
 		}
 		printf("Done.\n\n");
 	}
@@ -427,7 +464,7 @@ void OmegaATIThread::performExperimentConsecStep()
 			_yOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(1));
 			_xController = &_xOmegaFTController;
 			_yController = &_yOmegaFTController;
-			
+
 		}
 		//_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
 		_zOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(2));
@@ -435,7 +472,7 @@ void OmegaATIThread::performExperimentConsecStep()
 	}
 	else if(_experimentData.controlStrategy == 2) // 2 is for positon controller
 	{
-		
+
 		if(_experimentData.forceAxis != 2)
 		{
 			_xPositionController.setSetpoint(_experimentData.forceSetpoint.at(0));
@@ -444,7 +481,7 @@ void OmegaATIThread::performExperimentConsecStep()
 			//_yControllerPos = &_yPositionController;
 		}
 		_zPositionController.setSetpoint(_experimentData.forceSetpoint.at(2));
-		
+
 		setPositionControl();
 	}
 
@@ -453,27 +490,27 @@ void OmegaATIThread::performExperimentConsecStep()
 
 void OmegaATIThread::performExperimentStep()
 {
-	
 
-	
+
+
 	//Change to free motion controller
 	setFreeMotionControl(true);
 	drdRegulatePos(true);
 	drdEnableFilter(true);
 	// Move to 0 posisition to avoid any collisions
 	drdMoveToPos(_experimentData.sampleLocation.at(0),_experimentData.sampleLocation.at(1),0);
-	
+
 	/*********************/
 	/// Use the motion control to get zero, then use force controll to change the position
 	// Then use the hybrid control
 
-	
+
 	// Move to sample point
 	drdMoveToPos(_experimentData.sampleLocation.at(0),
 		_experimentData.sampleLocation.at(1),
 		_experimentData.sampleLocation.at(2));
-	
-	
+
+
 	// Keep going down until force is greater than 0.1 N;
 
 	double fx, fy, fz;
@@ -484,16 +521,16 @@ void OmegaATIThread::performExperimentStep()
 			break;
 		offset -= 0.0001;
 		drdMoveToPos(_experimentData.sampleLocation.at(0),
-		_experimentData.sampleLocation.at(1),
-		_experimentData.sampleLocation.at(2)+offset);
+			_experimentData.sampleLocation.at(1),
+			_experimentData.sampleLocation.at(2)+offset);
 
-		printf("Not making contact yet\r");
+		//printf("Not making contact yet\r");
 		_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
 	}
 
-	
+
 	//dhdSleep(1);
-	
+
 	drdEnableFilter(false);
 	// Change the x, y force controller to omega force to make sure if there was a
 	// consecutive force sequce applied, we undo its effects
@@ -503,14 +540,14 @@ void OmegaATIThread::performExperimentStep()
 
 	UpdateOmegaPosition(); //update the position of the omega device in memory
 
-	
+
 	double f[8];
 	memset(f, 0, sizeof(f));
 	//f[2] = -0.5; // makes sure contact is maintained
 	drdSetForceAndTorqueAndGripperForce(f);
 
-	
-	
+
+
 
 	// This part is to avoid jumping when we deregulare position, clean later
 	double px, py, pz;
@@ -527,12 +564,12 @@ void OmegaATIThread::performExperimentStep()
 
 	_zOmegaFTController.setSetpoint(-0.1); // maintain contact
 	_zController = & _zOmegaFTController;
-	
 
-	
+
+
 	drdRegulatePos(false);
 
-	
+
 	setForceControl();
 
 	dhdSleep(0.3);
@@ -542,8 +579,8 @@ void OmegaATIThread::performExperimentStep()
 	if(_experimentData.controlStrategy == 1) // 1 is for forceController
 	{
 		if(_experimentData.forceAxis == 2){
-			
-		    _zOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(2));
+
+			_zOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(2));
 			_zController = &_zOmegaFTController;
 		}
 		setForceControl();
@@ -555,19 +592,19 @@ void OmegaATIThread::performExperimentStep()
 		_yOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(1));
 		//_yOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(1));
 		_xController = &_xOmegaFTController;
-			_yController = &_yOmegaFTController;
-			// End experimental 
+		_yController = &_yOmegaFTController;
+		// End experimental 
 	}
 	else if(_experimentData.controlStrategy == 2)
 	{
 		if(_experimentData.forceAxis == 2)
 			_zPositionController.setSetpoint(_experimentData.forceSetpoint.at(2));
-		
+
 		setPositionControl();
 	}
 
 	dhdSleep(_experimentData.contactPeriod);
-	
+
 
 }
 
@@ -582,13 +619,13 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 	_experimentData.isConsecutiveForce = bottle.check("isConsecutiveForce", Value(0)).asInt();
 	Bottle* forceList = bottle.find("forceSetpoint").asList();
 	Bottle* sampleLocationList = bottle.find("sampleLocation").asList();
-	//Bottle* sampleLocationEndpointList =  bottle.find("sampleLocationEndpoint").asList();
+	Bottle* sampleLocationEndpointList =  bottle.find("sampleLocationEndpoint").asList();
 
-	/*if((forceList->isNull() ||  sampleLocationEndpointList->isNull()))
+	if((forceList->isNull() ||  sampleLocationEndpointList->isNull()))
 	{
 		printf("Warning: no force or sample location endpoint could be read. Skipping the step\n");
 		return;
-	}*/
+	}
 
 	if((forceList->isNull() ||  sampleLocationList->isNull()))
 	{
@@ -604,13 +641,13 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 
 	_experimentData.forceSetpoint.clear();
 	_experimentData.sampleLocation.clear();
-	//_experimentData.sampleLocationEndpoint.clear();
+	_experimentData.sampleLocationEndpoint.clear();
 
 	for(int i = 0; i < 3; i++)
 	{
 		_experimentData.forceSetpoint.push_back(forceList->get(i).asDouble());
 		_experimentData.sampleLocation.push_back(sampleLocationList->get(i).asDouble());
-		//_experimentData.sampleLocationEndpoint.push_back(sampleLocationEndpointList->get(i).asDouble());
+		_experimentData.sampleLocationEndpoint.push_back(sampleLocationEndpointList->get(i).asDouble());
 	}
 
 	printf("Control strategy: %d\n", _experimentData.controlStrategy);
@@ -618,15 +655,15 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 		_experimentData.forceSetpoint.at(1), _experimentData.forceSetpoint.at(2));
 	printf("Sample location: (% 3.3f, % 3.3f, % 3.3f)\n", _experimentData.sampleLocation.at(0),
 		_experimentData.sampleLocation.at(1), _experimentData.sampleLocation.at(2) );
-	//printf("Sample end point: (% 3.3f, % 3.3f, % 3.3f)\n", _experimentData.sampleLocationEndpoint.at(0),
-	//	_experimentData.sampleLocationEndpoint.at(1), _experimentData.sampleLocationEndpoint.at(2) );
-	//printf("Step size: % 3.3f\n", _experimentData.stepSize);
+	printf("Sample end point: (% 3.3f, % 3.3f, % 3.3f)\n", _experimentData.sampleLocationEndpoint.at(0),
+		_experimentData.sampleLocationEndpoint.at(1), _experimentData.sampleLocationEndpoint.at(2) );
+	printf("Step size: % 3.3f\n", _experimentData.stepSize);
 	printf("Contact period: % 3.3f\n", _experimentData.contactPeriod);
 	printf("Hysteresis delay: % 3.3f\n", _experimentData.hysteresisDelay);
 	printf("IsConsecutive: %d\n", _experimentData.isConsecutiveForce);
 	printf("Force axis: %d \n\n", _experimentData.forceAxis);
 
- 
+
 }
 
 void OmegaATIThread::Configure()
