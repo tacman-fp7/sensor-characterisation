@@ -474,6 +474,24 @@ void OmegaATIThread::performExperimentStep()
 		_experimentData.sampleLocation.at(2));
 	
 
+	// Keep going down until force is greater than 0.1 N;
+
+	double fx, fy, fz;
+	double offset = 0;
+	_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+	while(fz > -0.02){
+		if(_experimentData.forceSetpoint.at(2) == 0)
+			break;
+		offset -= 0.0001;
+		drdMoveToPos(_experimentData.sampleLocation.at(0),
+		_experimentData.sampleLocation.at(1),
+		_experimentData.sampleLocation.at(2)+offset);
+
+		printf("Not making contact yet\r");
+		_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+	}
+
+
 	dhdSleep(0.01);
 	
 	drdEnableFilter(false);
@@ -507,12 +525,16 @@ void OmegaATIThread::performExperimentStep()
 	_zForceController.setRampSetpoint(_experimentData.sampleLocation.at(2));
 	// end of set to my controller
 
-	drdRegulatePos(false);
+	
 
 	setForceControl();
+	drdRegulatePos(false);
 
-	dhdSleep(0.1);
+	dhdSleep(1);
 
+	
+
+	
 	//return;
 	//_zPositionController.setSetpoint(-0.1);
 		
