@@ -42,12 +42,15 @@ void OmegaATIThread::setFreeMotionControl(bool on)
 		{
 
 			drdRegulatePos(false);
+			double f[8];
+			memset(f, 0, sizeof(f));
+			drdSetForceAndTorqueAndGripperForce(f);
 		}
 		else
 		{
 			double f[8];
 			memset(f, 0, sizeof(f));
-			f[2] = -0.5;
+			f[2] = 0;
 			drdSetForceAndTorqueAndGripperForce(f);
 		}
 		// Set the controler to free motion control
@@ -213,7 +216,7 @@ bool OmegaATIThread::threadInit()
 	// Tentatitive, to be changed during runtime
 	_xController = &_xForceController;  // Force controller
 	_yController = &_yForceController;  // Force controller
-	_zController = &_zOmegaFTController; //Hybrid controller
+	_zController = &_zForceController; //&_zOmegaFTController; //Hybrid controller
 
 	// Urgh
 	_xControllerPos = &_xZeroPositionController;
@@ -281,9 +284,10 @@ bool OmegaATIThread::InitOmegaCommon()
 	drdSetEncPGain(8); //TDODO: config file parameter
 	drdSetEncIGain(16);
 
+	dhdSetEffectorMass(0.215); //Value determined using trial and error
 	drdEnableFilter(true);
 	//Initial position
-	drdMoveToPos(-.02, 0, 0); // Safe position above the finger
+	drdMoveToPos(0, 0, 0); // Safe position 
 	drdEnableFilter(false);
 
 }
@@ -296,10 +300,10 @@ bool OmegaATIThread::OmegaSetForceControl()
 	drdRegulateRot(false);
 	drdEnableFilter(false);
 
-	double f[8];
-	memset(f, 0, sizeof(f));
-	f[2] = -0.5;
-	drdSetForceAndTorqueAndGripperForce(f);
+	//double f[8];
+	//memset(f, 0, sizeof(f));
+	//f[2] = -0.5;
+	//drdSetForceAndTorqueAndGripperForce(f);
 
 	return true;
 
@@ -419,14 +423,14 @@ void OmegaATIThread::performExperimentConsecStep()
 		if(_experimentData.forceAxis != 2)
 		{
 			// In this case I have to change the PID controller
-			_xOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(0));
-			_yOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(1));
+			_xOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(0));
+			_yOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(1));
 			_xController = &_xOmegaFTController;
 			_yController = &_yOmegaFTController;
 			
 		}
-		_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
-	
+		//_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
+		_zOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(2));
 		setForceControl();
 	}
 	else if(_experimentData.controlStrategy == 2) // 2 is for positon controller
@@ -449,6 +453,7 @@ void OmegaATIThread::performExperimentConsecStep()
 
 void OmegaATIThread::performExperimentStep()
 {
+	
 
 	
 	//Change to free motion controller
@@ -456,26 +461,75 @@ void OmegaATIThread::performExperimentStep()
 	drdRegulatePos(true);
 	drdEnableFilter(true);
 	// Move to 0 posisition to avoid any collisions
-	drdMoveToPos(0,0,0);
+	drdMoveToPos(_experimentData.sampleLocation.at(0),_experimentData.sampleLocation.at(1),0);
+	
+	/*********************/
+	/// Use the motion control to get zero, then use force controll to change the position
+	// Then use the hybrid control
+
+	
 	// Move to sample point
 	drdMoveToPos(_experimentData.sampleLocation.at(0),
 		_experimentData.sampleLocation.at(1),
 		_experimentData.sampleLocation.at(2));
-	drdEnableFilter(false);
-	UpdateOmegaPosition(); //update the position of the omega device in memory
 	
+
+	dhdSleep(0.01);
+	
+	drdEnableFilter(false);
 	// Change the x, y force controller to omega force to make sure if there was a
 	// consecutive force sequce applied, we undo its effects
-
 	_xController = &_xForceController;
 	_yController = &_yForceController;
+	_zController = &_zForceController; //_zController = &_zOmegaFTController;
 
-	// At the moment I am only considering z-axis force
+	UpdateOmegaPosition(); //update the position of the omega device in memory
+
+	
+	double f[8];
+	memset(f, 0, sizeof(f));
+	//f[2] = -1;
+	drdSetForceAndTorqueAndGripperForce(f);
+
+	
+	
+
+	// This part is to avoid jumping when we deregulare position, clean later
+	double px, py, pz;
+	_omegaData.getAxesPos(&px, &py, &pz);
+	// set to my controller
+	_xForceController.setSetpoint(px);
+	_yForceController.setSetpoint(py);
+	_zForceController.setSetpoint(pz);
+
+	_xForceController.setRampSetpoint(_experimentData.sampleLocation.at(0));
+	_yForceController.setRampSetpoint(_experimentData.sampleLocation.at(1));
+	_zForceController.setRampSetpoint(_experimentData.sampleLocation.at(2));
+	// end of set to my controller
+
+	drdRegulatePos(false);
+
+	setForceControl();
+
+	dhdSleep(0.1);
+
+	//return;
+	//_zPositionController.setSetpoint(-0.1);
+		
+    //setPositionControl();
+
+	//dhdSleep(0.1);
+
+	//return;
+
 	if(_experimentData.controlStrategy == 1) // 1 is for forceController
 	{
-		if(_experimentData.forceAxis == 2)
-			_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
-	
+		if(_experimentData.forceAxis == 2){
+			
+			//_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
+		    _zOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(2));
+			_zController = &_zOmegaFTController;
+		}
 		setForceControl();
 	}
 	else if(_experimentData.controlStrategy == 2)

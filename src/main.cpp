@@ -17,6 +17,7 @@ using namespace yarp::os;
 int main(int argc, char *argv[]) {
 
 	Network yarp;
+	double massVal = 0.215;
 	bool freeCtrl = false;
 	if (!yarp.checkNetwork())
 	{
@@ -78,7 +79,15 @@ int main(int argc, char *argv[]) {
 			}
 			else if( key == 'D')
 			{
-				experimentThread.stepDown();
+				massVal += 0.001;
+				dhdSetEffectorMass(massVal);
+				double mass;
+				int ret = dhdGetEffectorMass(&mass);
+				if(ret == 0)
+				printf("Mass: % 3.3f\n", mass);
+				else
+					printf("error\n");
+				//experimentThread.stepDown();
 			}
 			else if ( key == 'b' || key == 'B')
 				experimentThread.updateBias();

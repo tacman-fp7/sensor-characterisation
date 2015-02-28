@@ -24,9 +24,11 @@ public:
 	void setKd(double Kd);
 	void setOutMax(double outMax);
 	void setOutMin(double outMin);
-	void setSetpoint(double setpoint);
+	virtual void setSetpoint(double setpoint);
+	
 	double getSetpoint();
 	void InitController(pidParams_t params);
+	virtual void setRampSetpoint(double setpoint);
 
 
 	virtual double update(double curval){return 0;}
@@ -38,10 +40,13 @@ private:
 	inline double P(double error);
 	inline double I(double error);
 	inline double D(double error);
+	
 
 protected:
+	double _integral;
 	double _setpoint;
-	
+	double _rampSetpoint;
+	void rampSetpoint();
 
 private:
 	double _Kp;
@@ -52,7 +57,7 @@ private:
 	clock_t _clkTicks;
 	time_t _timer;
 	double _tSample;
-	double _integral;
+	
 	
 };
 

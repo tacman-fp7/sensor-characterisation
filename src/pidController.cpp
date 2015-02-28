@@ -1,6 +1,7 @@
 #include "pidController.h"
 #include <stdio.h>
 #include <time.h>
+#include <drdc.h>
 
 PidController::PidController()
 {
@@ -8,6 +9,7 @@ PidController::PidController()
 	_Ki = 0;
 	_Kd = 0;
 	_setpoint = 0;
+	_rampSetpoint = 0;
 	_clkTicks = 0;
 	_timer = 0;
 	_tSample = 1;
@@ -42,6 +44,44 @@ double PidController::getSetpoint()
 void PidController::setSetpoint(double setpoint)
 {
 	_setpoint = setpoint;
+	_rampSetpoint = setpoint;
+	_integral = 0;
+}
+
+void PidController::setRampSetpoint(double setpoint)
+	{
+		_rampSetpoint = setpoint;
+	   _integral = 0;
+	}
+
+
+
+void PidController::rampSetpoint()
+{
+	
+	
+	double diff = _setpoint - _rampSetpoint;
+	double rampValue = diff/100; 
+
+	if(diff == 0)
+		return;
+
+	if(diff > 0)
+	{
+			_setpoint -=  rampValue; //0.01;
+			_integral = 0;
+			//printf("% 1.3f, % 1.3f, % 1.3f\n", _rampSetpoint, _setpoint, _integral);		
+	}
+	else
+	{
+		
+		_setpoint -= rampValue;
+			_integral = 0;
+			//printf("% 1.3f, % 1.3f, % 1.3f\n", _rampSetpoint, _setpoint, _integral);
+			
+	}
+	
+	
 }
 
 inline double PidController::P(double error)
