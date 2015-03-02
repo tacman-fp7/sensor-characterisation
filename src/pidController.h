@@ -47,6 +47,7 @@ protected:
 	double _setpoint;
 	double _rampSetpoint;
 	void rampSetpoint();
+	double _rampValue;
 
 private:
 	double _Kp;

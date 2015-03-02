@@ -18,7 +18,9 @@ public:
 	}
 	virtual void setRampSetpoint(double setpoint)
 	{
+		
 		_rampSetpoint = setpoint;
+		_rampValue = (_setpoint - _rampSetpoint)/100;
 	   _integral = 0;
 	}
 };

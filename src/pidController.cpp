@@ -14,6 +14,7 @@ PidController::PidController()
 	_timer = 0;
 	_tSample = 1;
 	_integral = 0;
+	_rampValue = 0;
 }
 
 void PidController::InitController(pidParams_t params)
@@ -51,6 +52,7 @@ void PidController::setSetpoint(double setpoint)
 void PidController::setRampSetpoint(double setpoint)
 	{
 		_rampSetpoint = setpoint;
+		_rampValue = (_setpoint - _rampSetpoint)/100;
 	   _integral = 0;
 	}
 
@@ -61,21 +63,32 @@ void PidController::rampSetpoint()
 	
 	
 	double diff = _setpoint - _rampSetpoint;
-	double rampValue = diff/100; 
+	//double rampValue = diff/100; 
 
 	if(diff == 0)
 		return;
 
+	// TODO: I have to consider other conditions
+	if(_rampSetpoint < 0){
+		if(_setpoint <= _rampSetpoint)
+		{
+			//printf("Ramp reached % 1.3f\n", _integral);
+			return;
+		}
+	}
+
+	
+
 	if(diff > 0)
 	{
-			_setpoint -=  rampValue; //0.01;
+			_setpoint -=  _rampValue; //0.01;
 			_integral = 0;
-			//printf("% 1.3f, % 1.3f, % 1.3f\n", _rampSetpoint, _setpoint, _integral);		
+			//printf("% 1.3f, % 1.3f, % 1.3f, % 1.3f\n", _rampSetpoint, _setpoint, _integral, diff);		
 	}
 	else
 	{
 		
-		_setpoint -= rampValue;
+		_setpoint -= _rampValue;
 			_integral = 0;
 			//printf("% 1.3f, % 1.3f, % 1.3f\n", _rampSetpoint, _setpoint, _integral);
 			

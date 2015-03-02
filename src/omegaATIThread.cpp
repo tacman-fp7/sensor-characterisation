@@ -423,12 +423,12 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 				vy /= mag;
 
 				int nSteps = int(mag / (_experimentData.stepSize / 1000));
-
+				nSteps -=1;
 				printf("Expected steps for mag (%f): %d \n", mag, nSteps);
 				// Go through steps
 
 
-				for (int step = 0; step < nSteps  ; step++)
+				for (int step = 0; step < nSteps ; step++)
 				{
 					printf("Step %02d\n", step); 
 
@@ -436,7 +436,7 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 					_experimentData.sampleLocation.at(1) += vy* step * _experimentData.stepSize / 1000;
 
 					performExperimentStep();
-					dhdSleep(_experimentData.hysteresisDelay);
+					
 
 
 				}
@@ -462,8 +462,8 @@ void OmegaATIThread::performExperimentConsecStep()
 			// In this case I have to change the PID controller
 			_xOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(0));
 			_yOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(1));
-			_xController = &_xOmegaFTController;
-			_yController = &_yOmegaFTController;
+//			_xController = &_xOmegaFTController;
+//			_yController = &_yOmegaFTController;
 
 		}
 		//_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
@@ -500,6 +500,7 @@ void OmegaATIThread::performExperimentStep()
 	// Move to 0 posisition to avoid any collisions
 	drdMoveToPos(_experimentData.sampleLocation.at(0),_experimentData.sampleLocation.at(1),0);
 
+	dhdSleep(_experimentData.hysteresisDelay);
 	/*********************/
 	/// Use the motion control to get zero, then use force controll to change the position
 	// Then use the hybrid control
