@@ -423,17 +423,20 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 				vy /= mag;
 
 				int nSteps = int(mag / (_experimentData.stepSize / 1000));
-				nSteps -=1;
-				printf("Expected steps for mag (%f): %d \n", mag, nSteps);
+				//nSteps -=1;
+				printf("Expected steps for mag (%f): %d \n", mag,	 nSteps);
 				// Go through steps
 
+				printf("Step %02d\n", step); 
+				performExperimentStep();
+				printf("Done!\n");
 
 				for (int step = 0; step < nSteps ; step++)
 				{
 					printf("Step %02d\n", step); 
 
-					_experimentData.sampleLocation.at(0) += vx* step * _experimentData.stepSize / 1000;
-					_experimentData.sampleLocation.at(1) += vy* step * _experimentData.stepSize / 1000;
+					_experimentData.sampleLocation.at(0) += vx * _experimentData.stepSize / 1000;
+					_experimentData.sampleLocation.at(1) += vy *  _experimentData.stepSize / 1000;
 
 					performExperimentStep();
 					

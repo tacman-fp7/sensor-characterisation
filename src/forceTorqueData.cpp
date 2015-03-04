@@ -9,6 +9,7 @@ ForceTorqueData::ForceTorqueData()
 	_fxFiltered = _fyFiltered = _fzFiltered = 0;
 	_txFiltered = _tyFiltered = _tzFiltered = 0;
 
+	
 	_timeStamp.update();
 
 	_port_ft.open("/OmegaATI/ft");
@@ -27,12 +28,15 @@ void ForceTorqueData::publishData()
 	
 	Bottle& ft_output = _port_ft.prepare();
 	ft_output.clear();
+	yarp::os::Stamp timeStamp;
 
 	_mutex.lock();
+	
 	ft_output.addDouble(_fx - _fxBias);
 	ft_output.addDouble(_fy - _fyBias);
 	ft_output.addDouble(_fz - _fzBias);
-	_port_ft.setEnvelope(_timeStamp);
+	timeStamp.update();
+	_port_ft.setEnvelope(timeStamp);
 	_mutex.unlock(); //////////////////<<<<--
     _port_ft.write();
 
