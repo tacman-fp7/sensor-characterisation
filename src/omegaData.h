@@ -24,7 +24,7 @@ public:
 		_port_omega.open("/OmegaATI/omegaPosition");
 	};
 
-	void publishData();
+	void publishData(yarp::os::Stamp& timeStamp);
 
 	void updateData()
 	{

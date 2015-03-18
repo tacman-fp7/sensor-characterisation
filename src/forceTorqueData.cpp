@@ -23,22 +23,24 @@ ForceTorqueData::ForceTorqueData()
 		_filterBuffer.push(tempArray);
 };
 
-void ForceTorqueData::publishData()
+void ForceTorqueData::publishData(yarp::os::Stamp& timeStamp)
 {
+	
 	
 	Bottle& ft_output = _port_ft.prepare();
 	ft_output.clear();
-	yarp::os::Stamp timeStamp;
+	//yarp::os::Stamp timeStamp;
+
+	
 
 	_mutex.lock();
 	
 	ft_output.addDouble(_fx - _fxBias);
 	ft_output.addDouble(_fy - _fyBias);
 	ft_output.addDouble(_fz - _fzBias);
-	timeStamp.update();
 	_port_ft.setEnvelope(timeStamp);
 	_mutex.unlock(); //////////////////<<<<--
-    _port_ft.write();
+    _port_ft.writeStrict();
 
 		/*
 
@@ -81,7 +83,7 @@ bool ForceTorqueData::updateData()
 	_ty = ft_input->get(4).asDouble();
 	_tz = ft_input->get(5).asDouble();
 
-	array<double, 6> tempArray;
+	/*array<double, 6> tempArray;
 	tempArray.at(0) = _fx - _fxBias;
 	tempArray.at(1) = _fy - _fyBias;
 	tempArray.at(2) = _fz - _fzBias;
@@ -96,7 +98,7 @@ bool ForceTorqueData::updateData()
 	_fxFiltered += (_fx -_fxBias - prevData.at(0))/FILTER_WINDOW;
 	_fyFiltered += (_fy -_fyBias - prevData.at(1))/FILTER_WINDOW;
 	_fzFiltered += (_fz -_fzBias - prevData.at(2))/FILTER_WINDOW;
-
+	*/
 	_mutex.unlock();
 
 	return true;

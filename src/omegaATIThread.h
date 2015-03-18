@@ -38,8 +38,13 @@ struct experimentDetails
 	double stepSize;
 	double contactPeriod; // rename to contactDuration
 	double hysteresisDelay;
+	double forceIncrements;
+	double forceMin;
 	int forceAxis;
 	int isConsecutiveForce;
+	int nRepeats;
+	
+	
 	
 };
 
@@ -54,6 +59,7 @@ public:
 	_zController = NULL;
 	AdjuctControlOutput = NULL;
 	_ftZForce = 0;
+	_dataCollectionPeriod = 20; // Default to 20 ms data collection period
 	memset(&_pidPosCtrl_filterOn, 0, sizeof(pidParams_t)); 
 	memset(&_pidPosCtrl_filterOff, 0, sizeof(pidParams_t)); 
 	memset(&_pidParams_omegaForceCtrl, 0, sizeof(pidParams_t)); 
@@ -126,6 +132,7 @@ private:
 	std::clock_t _time;
 
 	double _ftZForce;
+	int _dataCollectionPeriod;
 	pidParams_t _pidPosCtrl_filterOn; 
 	pidParams_t _pidPosCtrl_filterOff;
 	pidParams_t _pidParams_omegaForceCtrl;

@@ -24,7 +24,7 @@ public:
 	void setBias();
 	void setBias(double fxBias, double fyBias, double fzBias);
 	void getForces(double *fx, double *fy, double *fz);
-	void publishData();
+	void publishData(yarp::os::Stamp& timeStamp);
 	
 	void getBiasedForces(double *fx, double *fy, double *fz)
 	{

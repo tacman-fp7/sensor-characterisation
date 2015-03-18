@@ -10,12 +10,13 @@ void OmegaATIPubThread::run()
 	if(_omegaData == NULL)
 		return; //TODO: printout a warning
 
-	_sem_publishData.wait();
-	_forceTorqueData->publishData();
-	_omegaData->publishData();
-
 	
-
+	_timeStamp.update();
+	
+	//_sem_publishData.wait();
+	_forceTorqueData->publishData(_timeStamp);
+	_omegaData->publishData(_timeStamp);
+	
 }
 
 bool OmegaATIPubThread::threadInit()

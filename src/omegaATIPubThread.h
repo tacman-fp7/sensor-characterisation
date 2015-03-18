@@ -25,4 +25,5 @@ private:
 	Semaphore _sem_publishData;
 	ForceTorqueData* _forceTorqueData;
 	OmegaData* _omegaData;
+	yarp::os::Stamp _timeStamp;
 };

@@ -184,8 +184,8 @@ bool OmegaATIThread::threadInit()
 	// Set the current position of the device as the desired position
 	this->UpdateOmegaPosition();
 
-	// Start the publishing thread
-	_omegaATIPubThread = new OmegaATIPubThread(1, &_forceTorqueData, &_omegaData);
+	// Start the publishing thread 
+	_omegaATIPubThread = new OmegaATIPubThread(_dataCollectionPeriod, &_forceTorqueData, &_omegaData);
 	_omegaATIPubThread->start();
 
 
@@ -404,17 +404,33 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 		else
 		{
 
-
+			
 
 
 			// Should check step size
 			if(_experimentData.stepSize == 0)
 			{
-				performExperimentStep();
+				double maxForce = abs(_experimentData.forceSetpoint.at(2));
+				_experimentData.forceSetpoint.at(2) = _experimentData.forceMin;
+				int nSteps = (((maxForce - abs(_experimentData.forceMin))/ abs(_experimentData.forceIncrements))+1) * _experimentData.nRepeats;
+				printf("nSteps %d\n", abs(nSteps));
+				int nStep = 1;
+				while(abs(_experimentData.forceSetpoint.at(2)) <= maxForce)
+				{
+					
+					for ( int repeats = 0; repeats < _experimentData.nRepeats; repeats++)
+					{
+						printf("Substep: %2d\r", nStep);
+						performExperimentStep();
+						nStep++;
+					}
+					_experimentData.forceSetpoint.at(2) += _experimentData.forceIncrements; 
+				}
 			}
 			else
 			{
 
+				
 				double vx = _experimentData.sampleLocationEndpoint.at(0) - _experimentData.sampleLocation.at(0);
 				double vy = _experimentData.sampleLocationEndpoint.at(1) - _experimentData.sampleLocation.at(1);	
 				double mag = sqrt(vx * vx + vy * vy);
@@ -427,31 +443,36 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 				printf("Expected steps for mag (%f): %d \n", mag,	 nSteps);
 				// Go through steps
 
-				printf("Step %02d\n", step); 
+				printf("Step %02d\n", 0); 
 				performExperimentStep();
 				printf("Done!\n");
 
 				for (int step = 0; step < nSteps ; step++)
 				{
-					printf("Step %02d\n", step); 
+					printf("Step %02d\n", step+1); 
 
 					_experimentData.sampleLocation.at(0) += vx * _experimentData.stepSize / 1000;
 					_experimentData.sampleLocation.at(1) += vy *  _experimentData.stepSize / 1000;
 
-					performExperimentStep();
+					for ( int repeats = 0; repeats < _experimentData.nRepeats; repeats++)
+					{
+						performExperimentStep();
+					}
 					
 
 
 				}
 			}
 		}
-		printf("Done.\n\n");
+		printf("\n\nDone.\n\n");
 	}
 
 	// Experiment is done, reduce force TODO: rename variable for defaultFzFroce
 	_zOmegaFTController.setSetpoint(_ftZForce);
 	_zPositionController.setSetpoint(_ftZForce); 
+	setFreeMotionControl(true);
 }
+
 
 void OmegaATIThread::performExperimentConsecStep()
 {
@@ -503,6 +524,10 @@ void OmegaATIThread::performExperimentStep()
 	// Move to 0 posisition to avoid any collisions
 	drdMoveToPos(_experimentData.sampleLocation.at(0),_experimentData.sampleLocation.at(1),0);
 
+	//dhdSleep(_experimentData.hysteresisDelay/2);
+   //Bias the ft data
+	//_forceTorqueData.setBias();
+
 	dhdSleep(_experimentData.hysteresisDelay);
 	/*********************/
 	/// Use the motion control to get zero, then use force controll to change the position
@@ -512,18 +537,21 @@ void OmegaATIThread::performExperimentStep()
 	// Move to sample point
 	drdMoveToPos(_experimentData.sampleLocation.at(0),
 		_experimentData.sampleLocation.at(1),
-		_experimentData.sampleLocation.at(2));
+		_experimentData.sampleLocation.at(2)+0.0003);
 
 
 	// Keep going down until force is greater than 0.1 N;
 
-	double fx, fy, fz;
+	double fx, fy, fz=0;
 	double offset = 0;
+	//This is needed for higher forces
+	if(_experimentData.forceSetpoint.at(2) < -0.6)
+	{
 	_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
-	while(fz > -0.02){
+	while(fz > -0.01){
 		if(_experimentData.forceSetpoint.at(2) == 0)
 			break;
-		offset -= 0.0001;
+		offset -= 0.00001;
 		drdMoveToPos(_experimentData.sampleLocation.at(0),
 			_experimentData.sampleLocation.at(1),
 			_experimentData.sampleLocation.at(2)+offset);
@@ -531,9 +559,11 @@ void OmegaATIThread::performExperimentStep()
 		//printf("Not making contact yet\r");
 		_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
 	}
+	}
+	//End of higher forces
+	
 
-
-	//dhdSleep(1);
+	
 
 	drdEnableFilter(false);
 	// Change the x, y force controller to omega force to make sure if there was a
@@ -544,10 +574,14 @@ void OmegaATIThread::performExperimentStep()
 
 	UpdateOmegaPosition(); //update the position of the omega device in memory
 
+	
+	//double ox, oy, oz;
+	//_omegaData.getAxesPos(&ox, &oy, &oz);
+	//drdMoveToPos(ox, oy, oz+0.00001);
 
 	double f[8];
 	memset(f, 0, sizeof(f));
-	//f[2] = -0.5; // makes sure contact is maintained
+	f[2] = fz; // makes sure contact is maintained
 	drdSetForceAndTorqueAndGripperForce(f);
 
 
@@ -566,19 +600,26 @@ void OmegaATIThread::performExperimentStep()
 	_zForceController.setRampSetpoint(_experimentData.sampleLocation.at(2));
 	// end of set to my controller
 
-	_zOmegaFTController.setSetpoint(-0.1); // maintain contact
+	
+
+
+	
+	
+	//dhdSleep(0.1);
+
+	_zOmegaFTController.setSetpoint(fz); // maintain contact
 	_zController = & _zOmegaFTController;
-
-
-
-	drdRegulatePos(false);
-
 
 	setForceControl();
 
-	dhdSleep(0.3);
+	drdRegulatePos(false);
+	
+	
 
-
+	/////// Make sure setpoint is correctly set/reached
+	_xForceController.setSetpoint(_experimentData.sampleLocation.at(0));
+	_yForceController.setSetpoint(_experimentData.sampleLocation.at(1));
+	//////
 
 	if(_experimentData.controlStrategy == 1) // 1 is for forceController
 	{
@@ -586,11 +627,13 @@ void OmegaATIThread::performExperimentStep()
 
 			_zOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(2));
 			_zController = &_zOmegaFTController;
+			
 		}
 		setForceControl();
-		dhdSleep(0.2);
+		
 
 		// Experimental
+	dhdSleep(0.2);
 		_xOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(0));
 		//_xOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(0));
 		_yOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(1));
@@ -598,6 +641,8 @@ void OmegaATIThread::performExperimentStep()
 		_xController = &_xOmegaFTController;
 		_yController = &_yOmegaFTController;
 		// End experimental 
+
+	
 	}
 	else if(_experimentData.controlStrategy == 2)
 	{
@@ -607,6 +652,15 @@ void OmegaATIThread::performExperimentStep()
 		setPositionControl();
 	}
 
+	_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+	while(fz > _experimentData.forceSetpoint.at(2)/2){
+		if(_experimentData.forceSetpoint.at(2) == 0)
+			break;
+		_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+	
+	}
+
+	printf("Contact\r");
 	dhdSleep(_experimentData.contactPeriod);
 
 
@@ -621,6 +675,9 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 	_experimentData.stepSize = bottle.check("stepSize", Value(0)).asDouble();
 	_experimentData.forceAxis = bottle.check("forceAxis", Value(-1)).asInt();
 	_experimentData.isConsecutiveForce = bottle.check("isConsecutiveForce", Value(0)).asInt();
+	_experimentData.nRepeats = bottle.check("nRepeats", Value(1)).asInt();
+	_experimentData.forceIncrements = bottle.check("forceIncrements", Value(-0.5)).asDouble();
+	
 	Bottle* forceList = bottle.find("forceSetpoint").asList();
 	Bottle* sampleLocationList = bottle.find("sampleLocation").asList();
 	Bottle* sampleLocationEndpointList =  bottle.find("sampleLocationEndpoint").asList();
@@ -654,6 +711,9 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 		_experimentData.sampleLocationEndpoint.push_back(sampleLocationEndpointList->get(i).asDouble());
 	}
 
+	// Must be read after forceSetpoint is read
+	_experimentData.forceMin = bottle.check("forceMin", Value(_experimentData.forceSetpoint.at(2))).asDouble();
+
 	printf("Control strategy: %d\n", _experimentData.controlStrategy);
 	printf("Foce setpoint: (% 3.3f, % 3.3f, % 3.3f)\n", _experimentData.forceSetpoint.at(0),
 		_experimentData.forceSetpoint.at(1), _experimentData.forceSetpoint.at(2));
@@ -665,7 +725,10 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 	printf("Contact period: % 3.3f\n", _experimentData.contactPeriod);
 	printf("Hysteresis delay: % 3.3f\n", _experimentData.hysteresisDelay);
 	printf("IsConsecutive: %d\n", _experimentData.isConsecutiveForce);
-	printf("Force axis: %d \n\n", _experimentData.forceAxis);
+	printf("Force axis: %\n", _experimentData.forceAxis);
+	printf("nRepeats: %d\n", _experimentData.nRepeats);
+	printf("Force increments: % 3.3f\n", _experimentData.forceIncrements);
+	printf("Force min: % 3.3f\n\n", _experimentData.forceMin);
 
 
 }
@@ -695,6 +758,13 @@ void OmegaATIThread::Configure()
 			printf("Omega Max: %s\n", omegaMaxList->toString());
 			printf("Omega Min: %s\n", omegaMinList->toString());
 		}
+	}
+
+	
+	Bottle &DataCollection = _rsf.findGroup("DataCollection");
+	if(!DataCollection.isNull())
+	{
+		_dataCollectionPeriod = DataCollection.check("period", Value(20)).asInt();
 	}
 
 	Bottle &PIDPosCtrl_FilterOff = _rsf.findGroup("PIDPosCtrl_FilterOff");

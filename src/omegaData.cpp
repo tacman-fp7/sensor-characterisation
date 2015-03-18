@@ -1,7 +1,7 @@
 #include "omegaData.h"
 
 
-void OmegaData::publishData()
+void OmegaData::publishData(yarp::os::Stamp& timeStamp)
 {
 	Bottle& omegaOutput = _port_omega.prepare();
 	omegaOutput.clear();
@@ -12,9 +12,9 @@ void OmegaData::publishData()
 		omegaOutput.addDouble(drdPos[i]);
 
 	_mutex.lock();
-	_timeStamp.update();
-	_port_omega.setEnvelope(_timeStamp);
+	//_timeStamp.update();
+	_port_omega.setEnvelope(timeStamp);
 	_mutex.unlock();
 
-	_port_omega.write();
+	_port_omega.writeStrict();
 }
