@@ -396,74 +396,104 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 
 		// Run the step
 		printf("Running the step...");
-		if(_experimentData.isConsecutiveForce)
+
+		// Should check step size
+		if(_experimentData.stepSize == 0)
 		{
-			printf("\nconsecutive\n");
-			performExperimentConsecStep();
+			double maxForce = _experimentData.forceSetpoint.at(2);
+			_experimentData.forceSetpoint.at(2) = _experimentData.forceMin;
+			int nSteps = (((maxForce - abs(_experimentData.forceMin))/ abs(_experimentData.forceIncrements))+1) * _experimentData.nRepeats;
+			printf("nSteps %d\n", abs(nSteps));
+			int nStep = 1;
+			int factor = 1;
+			if(maxForce <= _experimentData.forceMin)
+			{
+
+				while(_experimentData.forceSetpoint.at(2)  >= maxForce)
+				{
+
+					for ( int repeats = 0; repeats < _experimentData.nRepeats; repeats++)
+					{
+						printf("Substep: %2d\r", nStep);
+
+
+						if(_experimentData.isConsecutiveForce)
+						{
+							performExperimentConsecStep();
+						}
+						else
+						{
+							performExperimentStep();
+						}
+						nStep++;
+					}
+					if(_experimentData.forceIncrements == 0)
+						break;
+
+					_experimentData.forceSetpoint.at(2) += _experimentData.forceIncrements; 
+				}
+			}
+			else // if max force is bigger than min force
+			{
+				while(_experimentData.forceSetpoint.at(2)  <= maxForce)
+				{
+
+					for ( int repeats = 0; repeats < _experimentData.nRepeats; repeats++)
+					{
+						printf("Substep: %2d\r", nStep);
+
+
+						if(_experimentData.isConsecutiveForce)
+						{
+							performExperimentConsecStep();
+						}
+						else
+						{
+							performExperimentStep();
+						}
+						nStep++;
+					}
+					if(_experimentData.forceIncrements == 0)
+						break;
+					_experimentData.forceSetpoint.at(2) += _experimentData.forceIncrements; 
+				}
+			}
 		}
 		else
 		{
 
-			
 
+			double vx = _experimentData.sampleLocationEndpoint.at(0) - _experimentData.sampleLocation.at(0);
+			double vy = _experimentData.sampleLocationEndpoint.at(1) - _experimentData.sampleLocation.at(1);	
+			double mag = sqrt(vx * vx + vy * vy);
+			// Unit vector
+			vx /= mag;
+			vy /= mag;
 
-			// Should check step size
-			if(_experimentData.stepSize == 0)
+			int nSteps = int(mag / (_experimentData.stepSize / 1000));
+			//nSteps -=1;
+			printf("Expected steps for mag (%f): %d \n", mag,	 nSteps);
+			// Go through steps
+
+			printf("Step %02d\n", 0); 
+			performExperimentStep();
+			printf("Done!\n");
+
+			for (int step = 0; step < nSteps ; step++)
 			{
-				double maxForce = abs(_experimentData.forceSetpoint.at(2));
-				_experimentData.forceSetpoint.at(2) = _experimentData.forceMin;
-				int nSteps = (((maxForce - abs(_experimentData.forceMin))/ abs(_experimentData.forceIncrements))+1) * _experimentData.nRepeats;
-				printf("nSteps %d\n", abs(nSteps));
-				int nStep = 1;
-				while(abs(_experimentData.forceSetpoint.at(2)) <= maxForce)
+				printf("Step %02d\n", step+1); 
+
+				_experimentData.sampleLocation.at(0) += vx * _experimentData.stepSize / 1000;
+				_experimentData.sampleLocation.at(1) += vy *  _experimentData.stepSize / 1000;
+
+				for ( int repeats = 0; repeats < _experimentData.nRepeats; repeats++)
 				{
-					
-					for ( int repeats = 0; repeats < _experimentData.nRepeats; repeats++)
-					{
-						printf("Substep: %2d\r", nStep);
-						performExperimentStep();
-						nStep++;
-					}
-					_experimentData.forceSetpoint.at(2) += _experimentData.forceIncrements; 
+					performExperimentStep();
 				}
-			}
-			else
-			{
 
-				
-				double vx = _experimentData.sampleLocationEndpoint.at(0) - _experimentData.sampleLocation.at(0);
-				double vy = _experimentData.sampleLocationEndpoint.at(1) - _experimentData.sampleLocation.at(1);	
-				double mag = sqrt(vx * vx + vy * vy);
-				// Unit vector
-				vx /= mag;
-				vy /= mag;
-
-				int nSteps = int(mag / (_experimentData.stepSize / 1000));
-				//nSteps -=1;
-				printf("Expected steps for mag (%f): %d \n", mag,	 nSteps);
-				// Go through steps
-
-				printf("Step %02d\n", 0); 
-				performExperimentStep();
-				printf("Done!\n");
-
-				for (int step = 0; step < nSteps ; step++)
-				{
-					printf("Step %02d\n", step+1); 
-
-					_experimentData.sampleLocation.at(0) += vx * _experimentData.stepSize / 1000;
-					_experimentData.sampleLocation.at(1) += vy *  _experimentData.stepSize / 1000;
-
-					for ( int repeats = 0; repeats < _experimentData.nRepeats; repeats++)
-					{
-						performExperimentStep();
-					}
-					
-
-
-				}
 			}
 		}
+
 		printf("\n\nDone.\n\n");
 	}
 
@@ -474,24 +504,26 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 }
 
 
+// I need to change this code to set a new setpoint that is all
 void OmegaATIThread::performExperimentConsecStep()
 {
+
+	bool up = false;
+	double fx, fy, fz=0;
+	_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+	if(fz < _experimentData.forceSetpoint.at(2))
+		up = true;
+
 	// I assume the position is same as the current position
 	UpdateOmegaPosition(); //update the position of the omega device in memory
 
 	if(_experimentData.controlStrategy == 1) // 1 is for forceController
 	{
-		if(_experimentData.forceAxis != 2)
-		{
-			// In this case I have to change the PID controller
-			_xOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(0));
-			_yOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(1));
-//			_xController = &_xOmegaFTController;
-//			_yController = &_yOmegaFTController;
+		
+	//_xController = &_xForceController;
+	//_yController = &_yForceController;
 
-		}
-		//_zOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(2));
-		_zOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(2));
+		_zController->setRampSetpoint(_experimentData.forceSetpoint.at(2));
 		setForceControl();
 	}
 	else if(_experimentData.controlStrategy == 2) // 2 is for positon controller
@@ -509,6 +541,23 @@ void OmegaATIThread::performExperimentConsecStep()
 		setPositionControl();
 	}
 
+	_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+	if(up)
+	{
+		while(fz <= _experimentData.forceSetpoint.at(2)){
+		if(_experimentData.forceSetpoint.at(2) == 0)
+			break;
+		_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+	}
+	}
+	else
+	{
+	while(fz >= _experimentData.forceSetpoint.at(2)){
+		if(_experimentData.forceSetpoint.at(2) == 0)
+			break;
+		_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+	}
+	}
 	dhdSleep(_experimentData.contactPeriod);
 }
 
@@ -525,7 +574,7 @@ void OmegaATIThread::performExperimentStep()
 	drdMoveToPos(_experimentData.sampleLocation.at(0),_experimentData.sampleLocation.at(1),0);
 
 	//dhdSleep(_experimentData.hysteresisDelay/2);
-   //Bias the ft data
+	//Bias the ft data
 	//_forceTorqueData.setBias();
 
 	dhdSleep(_experimentData.hysteresisDelay);
@@ -547,23 +596,23 @@ void OmegaATIThread::performExperimentStep()
 	//This is needed for higher forces
 	if(_experimentData.forceSetpoint.at(2) < -0.6)
 	{
-	_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
-	while(fz > -0.01){
-		if(_experimentData.forceSetpoint.at(2) == 0)
-			break;
-		offset -= 0.00001;
-		drdMoveToPos(_experimentData.sampleLocation.at(0),
-			_experimentData.sampleLocation.at(1),
-			_experimentData.sampleLocation.at(2)+offset);
-
-		//printf("Not making contact yet\r");
 		_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
-	}
+		while(fz > -0.01){
+			if(_experimentData.forceSetpoint.at(2) == 0)
+				break;
+			offset -= 0.00001;
+			drdMoveToPos(_experimentData.sampleLocation.at(0),
+				_experimentData.sampleLocation.at(1),
+				_experimentData.sampleLocation.at(2)+offset);
+
+			//printf("Not making contact yet\r");
+			_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
+		}
 	}
 	//End of higher forces
-	
 
-	
+
+
 
 	drdEnableFilter(false);
 	// Change the x, y force controller to omega force to make sure if there was a
@@ -574,7 +623,7 @@ void OmegaATIThread::performExperimentStep()
 
 	UpdateOmegaPosition(); //update the position of the omega device in memory
 
-	
+
 	//double ox, oy, oz;
 	//_omegaData.getAxesPos(&ox, &oy, &oz);
 	//drdMoveToPos(ox, oy, oz+0.00001);
@@ -600,11 +649,11 @@ void OmegaATIThread::performExperimentStep()
 	_zForceController.setRampSetpoint(_experimentData.sampleLocation.at(2));
 	// end of set to my controller
 
-	
 
 
-	
-	
+
+
+
 	//dhdSleep(0.1);
 
 	_zOmegaFTController.setSetpoint(fz); // maintain contact
@@ -613,8 +662,8 @@ void OmegaATIThread::performExperimentStep()
 	setForceControl();
 
 	drdRegulatePos(false);
-	
-	
+
+
 
 	/////// Make sure setpoint is correctly set/reached
 	_xForceController.setSetpoint(_experimentData.sampleLocation.at(0));
@@ -627,13 +676,13 @@ void OmegaATIThread::performExperimentStep()
 
 			_zOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(2));
 			_zController = &_zOmegaFTController;
-			
+
 		}
 		setForceControl();
-		
+
 
 		// Experimental
-	dhdSleep(0.2);
+		dhdSleep(0.2);
 		_xOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(0));
 		//_xOmegaFTController.setRampSetpoint(_experimentData.forceSetpoint.at(0));
 		_yOmegaFTController.setSetpoint(_experimentData.forceSetpoint.at(1));
@@ -642,7 +691,7 @@ void OmegaATIThread::performExperimentStep()
 		_yController = &_yOmegaFTController;
 		// End experimental 
 
-	
+
 	}
 	else if(_experimentData.controlStrategy == 2)
 	{
@@ -657,7 +706,7 @@ void OmegaATIThread::performExperimentStep()
 		if(_experimentData.forceSetpoint.at(2) == 0)
 			break;
 		_forceTorqueData.getBiasedForces(&fx, &fy, &fz);
-	
+
 	}
 
 	printf("Contact\r");
@@ -677,7 +726,7 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 	_experimentData.isConsecutiveForce = bottle.check("isConsecutiveForce", Value(0)).asInt();
 	_experimentData.nRepeats = bottle.check("nRepeats", Value(1)).asInt();
 	_experimentData.forceIncrements = bottle.check("forceIncrements", Value(-0.5)).asDouble();
-	
+
 	Bottle* forceList = bottle.find("forceSetpoint").asList();
 	Bottle* sampleLocationList = bottle.find("sampleLocation").asList();
 	Bottle* sampleLocationEndpointList =  bottle.find("sampleLocationEndpoint").asList();
@@ -760,7 +809,7 @@ void OmegaATIThread::Configure()
 		}
 	}
 
-	
+
 	Bottle &DataCollection = _rsf.findGroup("DataCollection");
 	if(!DataCollection.isNull())
 	{
