@@ -82,7 +82,7 @@ void PidController::rampSetpoint()
 
 	
 	_setpoint += _rampValue;
-	printf("%03f\r", _setpoint);
+	printf("%0.2f\r", _setpoint);
 	//_integral = 0;
 
 	

@@ -16,7 +16,8 @@ public:
 		
 		
 		_rampSetpoint = setpoint;
-		_rampValue = (_rampSetpoint - _setpoint)/ 10000;// 100;
+		_rampValue = (_rampSetpoint - _setpoint)/ 100;// 10000; <-- Was for hysteresis
+													  // 100 for normal
 	   //_integral = 0;
 	}
 };

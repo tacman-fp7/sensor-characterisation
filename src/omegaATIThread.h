@@ -43,6 +43,8 @@ struct experimentDetails
 	int forceAxis;
 	int isConsecutiveForce;
 	int nRepeats;
+	double sideStep;
+	double sampleThickness;
 	
 	
 	

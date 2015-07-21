@@ -174,7 +174,11 @@ bool OmegaATIThread::threadInit()
 
 
 	// Initialise omega device
+
 	ret = this->InitOmegaCommon();
+
+
+	
 
 	// We start in force control mode, which is smoother
 	AdjuctControlOutput = &OmegaATIThread::ForceControl;
@@ -183,6 +187,8 @@ bool OmegaATIThread::threadInit()
 
 	// Set the current position of the device as the desired position
 	this->UpdateOmegaPosition();
+
+
 
 	// Start the publishing thread 
 	_omegaATIPubThread = new OmegaATIPubThread(_dataCollectionPeriod, &_forceTorqueData, &_omegaData);
@@ -473,12 +479,23 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 			int nSteps = int(mag / (_experimentData.stepSize / 1000));
 			//nSteps -=1;
 			printf("Expected steps for mag (%f): %d \n", mag,	 nSteps);
+			
+			//for (int myI = 0; myI < 100; myI++){
+			// Offset the start and the end
+			_experimentData.sampleLocation.at(0) += -vx * _experimentData.sideStep / 1000;
+			_experimentData.sampleLocation.at(1) += vy *  _experimentData.sideStep / 1000;
+
+			_experimentData.sampleLocationEndpoint.at(0) += -vx * _experimentData.sideStep / 1000;
+			_experimentData.sampleLocationEndpoint.at(1) += vy *  _experimentData.sideStep / 1000;
 			// Go through steps
 
+			// 
 			printf("Step %02d\n", 0); 
 			performExperimentStep();
 			printf("Done!\n");
 
+			
+			
 			for (int step = 0; step < nSteps ; step++)
 			{
 				printf("Step %02d\n", step+1); 
@@ -586,7 +603,7 @@ void OmegaATIThread::performExperimentStep()
 	// Move to sample point
 	drdMoveToPos(_experimentData.sampleLocation.at(0),
 		_experimentData.sampleLocation.at(1),
-		_experimentData.sampleLocation.at(2)+0.0003);
+		_experimentData.sampleLocation.at(2));// + _experimentData.sampleThickness/1000.0 + 0.0003); 
 
 
 	// Keep going down until force is greater than 0.1 N;
@@ -722,6 +739,8 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 	_experimentData.contactPeriod = bottle.check("contactPeriod", Value(0.0)).asDouble();
 	_experimentData.hysteresisDelay = bottle.check("hysteresisDelay", Value(0.0)).asDouble();
 	_experimentData.stepSize = bottle.check("stepSize", Value(0)).asDouble();
+	_experimentData.sideStep = bottle.check("sideStep", Value(0)).asDouble();
+	_experimentData.sampleThickness = bottle.check("sampleThickness", Value(0)).asDouble();
 	_experimentData.forceAxis = bottle.check("forceAxis", Value(-1)).asInt();
 	_experimentData.isConsecutiveForce = bottle.check("isConsecutiveForce", Value(0)).asInt();
 	_experimentData.nRepeats = bottle.check("nRepeats", Value(1)).asInt();
@@ -777,7 +796,8 @@ void OmegaATIThread::ReadExperimentDetails(Bottle& bottle)
 	printf("Force axis: %\n", _experimentData.forceAxis);
 	printf("nRepeats: %d\n", _experimentData.nRepeats);
 	printf("Force increments: % 3.3f\n", _experimentData.forceIncrements);
-	printf("Force min: % 3.3f\n\n", _experimentData.forceMin);
+	printf("Force min: % 3.3f\n", _experimentData.forceMin);
+	printf("Sample Thickness: % 3.3f\n\n", _experimentData.sampleThickness);
 
 
 }
