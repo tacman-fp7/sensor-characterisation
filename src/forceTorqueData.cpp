@@ -38,6 +38,7 @@ void ForceTorqueData::publishData(yarp::os::Stamp& timeStamp)
 	ft_output.addDouble(_fx - _fxBias);
 	ft_output.addDouble(_fy - _fyBias);
 	ft_output.addDouble(_fz - _fzBias);
+	ft_output.addDouble(_resultant);
 	_port_ft.setEnvelope(timeStamp);
 	_mutex.unlock(); //////////////////<<<<--
     _port_ft.writeStrict();
@@ -83,6 +84,11 @@ bool ForceTorqueData::updateData()
 	_ty = ft_input->get(4).asDouble();
 	_tz = ft_input->get(5).asDouble();
 
+	_resultant = abs(_fx - _fxBias) + abs(_fy - _fyBias) + abs(_fz - _fzBias);
+		
+		/*sqrt((_fx - _fxBias) * (_fx - _fxBias)
+		+ (_fy - _fyBias) * (_fy - _fyBias)
+		+ (_fz - _fzBias) * (_fz - _fzBias));*/
 	/*array<double, 6> tempArray;
 	tempArray.at(0) = _fx - _fxBias;
 	tempArray.at(1) = _fy - _fyBias;

@@ -51,7 +51,7 @@ private:
 		_mutex.unlock();
 
 	}
-	double _fx, _fy, _fz, _tx, _ty, _tz;
+	double _fx, _fy, _fz, _tx, _ty, _tz, _resultant;
 	double _fxBias, _fyBias, _fzBias, _txBias, _tyBias, _tzBias;
 	double _fxFiltered, _fyFiltered, _fzFiltered, _txFiltered, _tyFiltered, _tzFiltered;
 	queue< array<double, FT_CHANNELS> > _filterBuffer;
