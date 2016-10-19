@@ -290,7 +290,7 @@ bool OmegaATIThread::InitOmegaCommon()
 	drdSetEncPGain(8); //TDODO: config file parameter
 	drdSetEncIGain(16);
 
-	dhdSetEffectorMass(0.215); //Value determined using trial and error
+	dhdSetEffectorMass(0.140); //Value determined using trial and error
 	drdEnableFilter(true);
 	//Initial position
 	drdMoveToPos(0, 0, 0); // Safe position 
@@ -517,7 +517,16 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 	// Experiment is done, reduce force TODO: rename variable for defaultFzFroce
 	_zOmegaFTController.setSetpoint(_ftZForce);
 	_zPositionController.setSetpoint(_ftZForce); 
-	setFreeMotionControl(true);
+	
+
+	_xPositionController.setSetpoint(0);
+	_yPositionController.setSetpoint(0);
+	_zPositionController.setSetpoint(0);
+	OmegaSetPositionControl();
+
+	//setFreeMotionControl(true);
+	
+	
 }
 
 
