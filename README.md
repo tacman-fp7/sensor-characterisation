@@ -1,5 +1,5 @@
 ## sensor-characterisation
-This module implements rountines that characterizes the iCub robot's fingertip on a benchtop setup.
+This module implements routines that characterize the iCub robot's fingertip on a bench-top setup.
 
 ## Dependencies
 [iCub: YARP, icub-main and icub-contrib](http://wiki.icub.org/wiki/ICub_Software_Installation)
