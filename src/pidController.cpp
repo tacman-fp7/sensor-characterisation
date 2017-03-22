@@ -67,6 +67,8 @@ void PidController::rampSetpoint()
 		if(_setpoint >= _rampSetpoint)
 		{
 			//printf("Ramp reached % 1.3f\n", _integral);
+			//printf("Force setpoint: %0.2f\r", _setpoint);
+			//printf("Contact force: %0.2f\r", _setpoint);
 			return;
 		}
 	}
@@ -82,7 +84,7 @@ void PidController::rampSetpoint()
 
 	
 	_setpoint += _rampValue;
-	printf("%0.2f\r", _setpoint);
+	//printf("Contact force: %0.2f\r", _setpoint);
 	//_integral = 0;
 
 	

@@ -408,7 +408,11 @@ void OmegaATIThread::runExperiment(ResourceFinder& rf)
 		{
 			double maxForce = _experimentData.forceSetpoint.at(2);
 			_experimentData.forceSetpoint.at(2) = _experimentData.forceMin;
+			int nSteps  =  _experimentData.nRepeats;
+			if(_experimentData.forceIncrements != 0){
+				
 			int nSteps = (((maxForce - abs(_experimentData.forceMin))/ abs(_experimentData.forceIncrements))+1) * _experimentData.nRepeats;
+			}
 			printf("nSteps %d\n", abs(nSteps));
 			int nStep = 1;
 			int factor = 1;
